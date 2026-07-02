@@ -542,6 +542,10 @@ actor S3Service {
 
             let key = String(content[keyStart.upperBound..<keyEnd.lowerBound])
 
+            // Skip folder-marker objects (zero-byte keys ending in "/"), e.g.
+            // the "steven/shots/" placeholder that represents the prefix itself.
+            if key.hasSuffix("/") { continue }
+
             var size: Int64 = 0
             if let sizeStart = content.range(of: "<Size>"),
                let sizeEnd = content.range(of: "</Size>") {
