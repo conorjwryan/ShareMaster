@@ -91,6 +91,11 @@ struct ContentView: View {
         .onChange(of: config.recentScope) { _, _ in
             Task { await loadRecent() }
         }
+        .onChange(of: config.destinations) { _, _ in
+            // Editing a destination (public URL base, link mode, expiry, bucket…)
+            // invalidates the resolved links in the recent list, so reload it.
+            Task { await loadRecent() }
+        }
     }
 
     // MARK: - Header

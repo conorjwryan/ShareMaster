@@ -342,6 +342,13 @@ struct DestinationEditor: View {
                 }
                 if destination.linkMode == .publicUrl {
                     TextField("Public URL Base", text: $destination.publicUrlBase, prompt: Text("https://static.example.com"))
+                    Label {
+                        Text("Public links require public access to be enabled on the provider dashboard (e.g. R2's public bucket / r2.dev URL or a custom domain), and that URL entered in Public URL Base above. Links will fail if either is missing.")
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.orange)
                 } else {
                     Picker("Link expiry", selection: $expiryPreset) {
                         Text("1 hour").tag(ExpiryPreset.h1)
