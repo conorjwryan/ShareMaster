@@ -82,16 +82,6 @@ struct SettingsView: View {
             
             Section {
                 HStack {
-                    Spacer()
-                    Button("Quit BucketDrop") {
-                        NSApp.terminate(nil)
-                    }
-                    Spacer()
-                }
-            }
-
-            Section {
-                HStack {
                     AsyncImage(url: URL(string: "https://github.com/fayazara.png")) { image in
                         image
                             .resizable()
@@ -120,6 +110,18 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
+                }
+            }
+
+            Section {
+                Button(role: .destructive) {
+                    NSApp.terminate(nil)
+                } label: {
+                    HStack {
+                        Spacer()
+                        Label("Quit BucketDrop", systemImage: "power")
+                        Spacer()
+                    }
                 }
             }
         }

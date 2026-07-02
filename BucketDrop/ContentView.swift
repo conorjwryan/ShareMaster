@@ -55,12 +55,23 @@ struct ContentView: View {
                 Text("BucketDrop")
                     .font(.headline)
                 Spacer()
-                Button {
-                    openSettings()
-                } label: {
-                    Image(systemName: "gear")
+                HStack(spacing: 12) {
+                    Button {
+                        openSettings()
+                    } label: {
+                        Image(systemName: "gear")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Settings")
+
+                    Button {
+                        NSApp.terminate(nil)
+                    } label: {
+                        Image(systemName: "power")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Quit BucketDrop")
                 }
-                .buttonStyle(.borderless)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
