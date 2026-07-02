@@ -80,8 +80,7 @@ struct ContentView: View {
                 }
             }
         }
-        .frame(width: 560, height: config.recentsExpanded ? 460 : 250)
-        .animation(.easeInOut(duration: 0.2), value: config.recentsExpanded)
+        .frame(width: 560, height: config.recentsExpanded ? 460 : 212, alignment: .top)
         .task {
             if selectedDestinationID == nil { selectedDestinationID = destinations.first?.id }
             if config.recentsExpanded { await loadRecent() }
@@ -263,6 +262,10 @@ struct ContentView: View {
                 }
 
                 recentList
+
+                // Pin everything above to the top so collapsing/expanding the
+                // recents section never shifts the header or drop zone.
+                Spacer(minLength: 0)
             }
         }
     }
@@ -279,6 +282,7 @@ struct ContentView: View {
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.semibold))
                             .rotationEffect(.degrees(config.recentsExpanded ? 90 : 0))
+                            .animation(.easeInOut(duration: 0.15), value: config.recentsExpanded)
                         Text(config.recentScope == .combined ? "Recent Uploads (All)" : "Recent Uploads")
                             .font(.subheadline)
                     }
@@ -302,7 +306,6 @@ struct ContentView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(Color(nsColor: .windowBackgroundColor))
 
             if !config.recentsExpanded {
                 EmptyView()
