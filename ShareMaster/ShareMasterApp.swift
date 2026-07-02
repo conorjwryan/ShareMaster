@@ -1,6 +1,6 @@
 //
-//  BucketDropApp.swift
-//  BucketDrop
+//  ShareMasterApp.swift
+//  ShareMaster
 //
 //  Created by Fayaz Ahmed Aralikatti on 12/01/26.
 //
@@ -18,7 +18,7 @@ class PopoverBackgroundView: NSView {
 }
 
 @main
-struct BucketDropApp: App {
+struct ShareMasterApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     var sharedModelContainer: ModelContainer = {
@@ -43,11 +43,11 @@ struct BucketDropApp: App {
 extension Notification.Name {
     /// Posted when files are dropped directly on the menu bar icon.
     /// userInfo: ["urls": [URL]]
-    static let statusItemDidReceiveDrop = Notification.Name("BucketDrop.statusItemDidReceiveDrop")
+    static let statusItemDidReceiveDrop = Notification.Name("ShareMaster.statusItemDidReceiveDrop")
 
     /// Posted when an upload batch finishes and its confirmation has been shown.
     /// userInfo: ["success": Bool]
-    static let uploadDidFinish = Notification.Name("BucketDrop.uploadDidFinish")
+    static let uploadDidFinish = Notification.Name("ShareMaster.uploadDidFinish")
 }
 
 /// Transparent overlay on the status item button that accepts file drags.
@@ -107,7 +107,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "archivebox", accessibilityDescription: "BucketDrop")
+            button.image = NSImage(systemSymbolName: "archivebox", accessibilityDescription: "ShareMaster")
             button.action = #selector(togglePopover)
             button.target = self
 
@@ -140,16 +140,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Setup popover
         popover = NSPopover()
-        popover?.contentSize = NSSize(width: 560, height: 460)
         popover?.behavior = .semitransient
         popover?.animates = true
-        
+
         let contentView = ContentView()
             .modelContainer(modelContainer!)
             .environment(\.openSettingsAction, OpenSettingsAction { [weak self] in
                 self?.openSettings()
             })
-        popover?.contentViewController = NSHostingController(rootView: contentView)
+        let hosting = NSHostingController(rootView: contentView)
+        // Let the popover track the SwiftUI content size, so it shrinks when
+        // the recents section is collapsed and grows when it's expanded.
+        hosting.sizingOptions = [.preferredContentSize]
+        popover?.contentViewController = hosting
 
         // If a drag-opened popover is dismissed some other way (click outside,
         // drag abandoned), clear the flag so a later click-opened popover
@@ -211,7 +214,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let hostingController = NSHostingController(rootView: settingsView)
         
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "BucketDrop Settings"
+        window.title = "ShareMaster Settings"
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
         

@@ -1,6 +1,6 @@
 //
 //  ConfigStore.swift
-//  BucketDrop
+//  ShareMaster
 //
 //  Stores reusable Accounts (credentials) and Destinations (bucket + path +
 //  link/naming options). Non-secret fields are persisted as JSON in
@@ -14,11 +14,16 @@ import Security
 // MARK: - Models
 
 /// A reusable set of credentials for one S3-compatible provider login.
+/// Transfer fields are optional so existing stored JSON decodes unchanged;
+/// nil means "use the app default".
 struct Account: Codable, Identifiable, Hashable {
     var id: UUID = UUID()
     var name: String = ""
     var region: String = "us-east-1"
     var endpoint: String = ""   // "" for AWS, custom URL for R2/MinIO/etc.
+    var uploadCapMBps: Double? = nil      // nil/0 = unlimited
+    var downloadCapMBps: Double? = nil    // nil/0 = unlimited
+    var maxConcurrentParts: Int? = nil    // nil = default (4)
 }
 
 enum LinkMode: String, Codable, CaseIterable, Identifiable {
@@ -35,12 +40,16 @@ struct Destination: Codable, Identifiable, Hashable {
     var bucket: String = ""
     var pathPrefix: String = ""        // "" or "backups/" (normalized on save)
     var publicUrlBase: String = ""
-    var namingTemplate: String = "{uuid}-{name}"
+    var namingTemplate: String = NamingTemplate.default
     var makePublic: Bool = true        // x-amz-acl: public-read on upload
     var linkMode: LinkMode = .publicUrl
     var presignExpirySeconds: Int = 86_400  // used when linkMode == .presigned
     var copyOnUpload: Bool = true      // auto-copy resulting link after upload
     var sortOrder: Int = 0
+    // Optional overrides of the account's transfer settings (nil = inherit).
+    var uploadCapMBps: Double? = nil
+    var downloadCapMBps: Double? = nil
+    var maxConcurrentParts: Int? = nil
 }
 
 enum RecentScope: String, Codable, CaseIterable, Identifiable {
@@ -63,6 +72,18 @@ struct S3Config {
     let linkMode: LinkMode
     let presignExpirySeconds: Int
     let copyOnUpload: Bool
+    // Resolved transfer settings (destination override ?? account ?? default).
+    let uploadCapMBps: Double      // 0 = unlimited
+    let downloadCapMBps: Double    // 0 = unlimited
+    let maxConcurrentParts: Int
+}
+
+extension S3Config {
+    nonisolated static let defaultConcurrentParts = 4
+
+    nonisolated static func resolveConcurrency(_ value: Int?) -> Int {
+        min(max(value ?? defaultConcurrentParts, 1), 16)
+    }
 }
 
 // MARK: - Store
@@ -72,13 +93,15 @@ final class ConfigStore {
     static let shared = ConfigStore()
 
     private let defaults = UserDefaults.standard
-    private let keychainService = "com.cjwr.BucketDrop"
+    private let keychainService = "com.cjwr.ShareMaster"
 
     private enum Keys {
         static let accounts = "config_accounts"
         static let destinations = "config_destinations"
         static let recentScope = "config_recent_scope"
         static let pinPopover = "config_pin_popover"
+        static let recentLimit = "config_recent_limit"
+        static let recentsExpanded = "config_recents_expanded"
     }
 
     private(set) var accounts: [Account] = [] {
@@ -97,6 +120,18 @@ final class ConfigStore {
         didSet { defaults.set(pinPopover, forKey: Keys.pinPopover) }
     }
 
+    /// How many recent uploads to show per listing. Keeps list traffic and
+    /// per-object link resolution down on metered providers.
+    var recentLimit: Int = 5 {
+        didSet { defaults.set(recentLimit, forKey: Keys.recentLimit) }
+    }
+
+    /// Whether the Recent Uploads section is expanded in the popover.
+    /// Collapsed (default) skips listing entirely until the user opens it.
+    var recentsExpanded: Bool = false {
+        didSet { defaults.set(recentsExpanded, forKey: Keys.recentsExpanded) }
+    }
+
     var isConfigured: Bool { !destinations.isEmpty }
 
     private init() {
@@ -107,6 +142,9 @@ final class ConfigStore {
             recentScope = scope
         }
         pinPopover = defaults.bool(forKey: Keys.pinPopover)
+        let storedLimit = defaults.integer(forKey: Keys.recentLimit)
+        if storedLimit > 0 { recentLimit = storedLimit }
+        recentsExpanded = defaults.bool(forKey: Keys.recentsExpanded)
         migrateLegacyConfigIfNeeded()
     }
 
@@ -138,11 +176,14 @@ final class ConfigStore {
             bucket: destination.bucket,
             pathPrefix: normalizePrefix(destination.pathPrefix),
             publicUrlBase: destination.publicUrlBase,
-            namingTemplate: destination.namingTemplate.isEmpty ? "{uuid}-{name}" : destination.namingTemplate,
+            namingTemplate: destination.namingTemplate.isEmpty ? NamingTemplate.default : destination.namingTemplate,
             makePublic: destination.makePublic,
             linkMode: destination.linkMode,
             presignExpirySeconds: destination.presignExpirySeconds,
-            copyOnUpload: destination.copyOnUpload
+            copyOnUpload: destination.copyOnUpload,
+            uploadCapMBps: destination.uploadCapMBps ?? account.uploadCapMBps ?? 0,
+            downloadCapMBps: destination.downloadCapMBps ?? account.downloadCapMBps ?? 0,
+            maxConcurrentParts: S3Config.resolveConcurrency(destination.maxConcurrentParts ?? account.maxConcurrentParts)
         )
     }
 
@@ -157,11 +198,14 @@ final class ConfigStore {
             bucket: bucket,
             pathPrefix: "",
             publicUrlBase: "",
-            namingTemplate: "{uuid}-{name}",
+            namingTemplate: NamingTemplate.default,
             makePublic: false,
             linkMode: .publicUrl,
             presignExpirySeconds: 86_400,
-            copyOnUpload: false
+            copyOnUpload: false,
+            uploadCapMBps: 0,
+            downloadCapMBps: 0,
+            maxConcurrentParts: S3Config.defaultConcurrentParts
         )
     }
 

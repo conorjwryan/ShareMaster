@@ -1,51 +1,43 @@
-# BucketDrop
+# ShareMaster
 
-<img width="1280" height="800" alt="Preview 1" src="https://github.com/user-attachments/assets/a37fd19a-7711-49a6-b5f4-40d9024508b4" />
-
-Bucketdrop is a simple macOS menubar app for uploading files to S3-compatible storage (Cloudflare R2, AWS S3, MinIO, etc.).
-
+ShareMaster is a macOS menu bar app for uploading files to S3-compatible storage (Cloudflare R2, AWS S3, MinIO, etc.) and sharing the link in one motion.
 
 ## Features
 
-- Drag & drop files to upload instantly
-- Click to select files from Finder
-- Supports multiple file uploads
-- URLs automatically copied to clipboard
-- Quick Look preview for files
-- Download files directly to your Mac
+- Drag & drop onto the menu bar icon — the popover opens mid-drag so you can pick a destination
+- Multiple accounts and destinations (bucket + path + naming template + link options)
+- Multipart uploads and ranged downloads with configurable concurrency
+- Optional upload/download bandwidth caps (per account, with per-destination overrides)
+- Public or presigned share links, copied to your clipboard automatically
+- Quick Look preview, download, and delete for recent uploads
 - Works with AWS S3, Cloudflare R2, MinIO, and other S3-compatible services
 
 ## Installation
 
-1. Move `BucketDrop.app` to your Applications folder
-2. Open the app - it will appear in your menubar
+1. Move `ShareMaster.app` to your Applications folder
+2. Open the app — it will appear in your menu bar
 
 ## Setup
 
-1. Click the BucketDrop icon in the menubar
+1. Click the ShareMaster icon in the menu bar
 2. Click the gear icon to open Settings
-3. Enter your S3 credentials:
-   - **Access Key ID**
-   - **Secret Access Key**
-   - **Bucket Name**
-   - **Region** (e.g., `us-east-1`, or `auto` for Cloudflare R2)
-4. For S3-compatible services (R2, MinIO):
-   - **S3 Endpoint** - Your service's S3 API endpoint
-   - **Public URL Base** - Your custom domain for accessing files
-5. Click "Test Connection" to verify, then "Save"
+3. Add an **Account** (credentials): Access Key ID, Secret Access Key, Region (`auto` for Cloudflare R2), and an S3 endpoint for non-AWS services
+4. Add a **Destination**: pick the account, set the bucket, optional path prefix, naming template, and link mode (public or presigned)
 
 ## Usage
 
-- **Drag & drop** files onto the menubar popover to upload
+- **Drag** files over the menu bar icon, then drop on a destination in the sidebar (or on the icon itself for the current destination)
 - **Click** the drop zone to select files from Finder
-- **Double-click** a file in the list to preview with Quick Look
-- **Hover** over a file to see action buttons (copy URL, download, delete)
-
-Uploaded file URLs are automatically copied to your clipboard.
+- **Double-click** a recent file to preview with Quick Look
+- **Hover** over a file to see action buttons (copy link, download, delete)
 
 ## Requirements
 
 - macOS 14.0 (Sonoma) or later
+
+## Acknowledgements
+
+ShareMaster is developed by [Conor Ryan](https://x.com/conorjwryan), built on the foundation of [BucketDrop](https://github.com/fayazara/bucketdrop) by [Fayaz Ahmed](https://x.com/fayazara).
 
 ## License
 

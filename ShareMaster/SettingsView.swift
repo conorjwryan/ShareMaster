@@ -1,6 +1,6 @@
 //
 //  SettingsView.swift
-//  BucketDrop
+//  ShareMaster
 //
 //  Created by Fayaz Ahmed Aralikatti on 12/01/26.
 //
@@ -144,6 +144,21 @@ struct AccountEditor: View {
                 Text("S3-Compatible (R2, MinIO, etc.)")
             } footer: {
                 Text("For Cloudflare R2: paste the S3 API endpoint URL and set region to 'auto'. Leave blank for AWS.")
+            }
+
+            Section {
+                TextField("Upload limit (MB/s)", value: $account.uploadCapMBps, format: .number, prompt: Text("Unlimited"))
+                TextField("Download limit (MB/s)", value: $account.downloadCapMBps, format: .number, prompt: Text("Unlimited"))
+                Picker("Concurrent parts", selection: $account.maxConcurrentParts) {
+                    Text("Default (4)").tag(Int?.none)
+                    ForEach([1, 2, 4, 6, 8, 12, 16], id: \.self) { n in
+                        Text("\(n)").tag(Int?.some(n))
+                    }
+                }
+            } header: {
+                Text("Transfers")
+            } footer: {
+                Text("Large files transfer in multiple parts at once — more concurrent parts is faster on quick connections. Leave limits empty for unlimited speed. Destinations can override these settings.")
             }
 
             Section("Test Connection") {
@@ -292,6 +307,7 @@ struct DestinationEditor: View {
 
     @State private var expiryPreset: ExpiryPreset = .d1
     @State private var customHours: Int = 24
+    @State private var overrideTransfers = false
 
     enum ExpiryPreset: Hashable {
         case h1, h6, d1, d7, custom
@@ -363,6 +379,24 @@ struct DestinationEditor: View {
                 }
                 Toggle("Copy link to clipboard after upload", isOn: $destination.copyOnUpload)
             }
+
+            Section {
+                Toggle("Override account transfer settings", isOn: $overrideTransfers)
+                if overrideTransfers {
+                    TextField("Upload limit (MB/s)", value: $destination.uploadCapMBps, format: .number, prompt: Text("Account default"))
+                    TextField("Download limit (MB/s)", value: $destination.downloadCapMBps, format: .number, prompt: Text("Account default"))
+                    Picker("Concurrent parts", selection: $destination.maxConcurrentParts) {
+                        Text("Account default").tag(Int?.none)
+                        ForEach([1, 2, 4, 6, 8, 12, 16], id: \.self) { n in
+                            Text("\(n)").tag(Int?.some(n))
+                        }
+                    }
+                }
+            } header: {
+                Text("Transfers")
+            } footer: {
+                Text("Any field left empty keeps the account's setting for just that value.")
+            }
         }
         .formStyle(.grouped)
         .frame(width: 460, height: 560)
@@ -379,6 +413,9 @@ struct DestinationEditor: View {
     }
 
     private func loadExpiry() {
+        overrideTransfers = destination.uploadCapMBps != nil
+            || destination.downloadCapMBps != nil
+            || destination.maxConcurrentParts != nil
         switch destination.presignExpirySeconds {
         case 3_600: expiryPreset = .h1
         case 21_600: expiryPreset = .h6
@@ -393,6 +430,11 @@ struct DestinationEditor: View {
     private func save() {
         if destination.linkMode == .presigned {
             destination.presignExpirySeconds = expiryPreset.seconds ?? (customHours * 3_600)
+        }
+        if !overrideTransfers {
+            destination.uploadCapMBps = nil
+            destination.downloadCapMBps = nil
+            destination.maxConcurrentParts = nil
         }
         config.upsertDestination(destination)
         dismiss()
@@ -412,7 +454,7 @@ struct GeneralSettingsView: View {
                     set: { config.pinPopover = $0 }
                 ))
             } footer: {
-                Text("When off, the BucketDrop window closes as soon as you click another window or switch apps. When on, it stays on top until you close it yourself.")
+                Text("When off, the ShareMaster window closes as soon as you click another window or switch apps. When on, it stays on top until you close it yourself.")
             }
 
             Section {
@@ -424,8 +466,17 @@ struct GeneralSettingsView: View {
                     Text("Combined (all destinations)").tag(RecentScope.combined)
                 }
                 .pickerStyle(.radioGroup)
+
+                Picker("Show at most", selection: Binding(
+                    get: { config.recentLimit },
+                    set: { config.recentLimit = $0 }
+                )) {
+                    ForEach([5, 10, 25, 50], id: \.self) { n in
+                        Text("\(n) files").tag(n)
+                    }
+                }
             } footer: {
-                Text("Per destination shows only the selected destination's files. Combined merges files from every destination with a badge showing where each one lives.")
+                Text("Per destination shows only the selected destination's files. Combined merges files from every destination with a badge showing where each one lives. The list only loads while expanded, and shows at most the number of files chosen here — keeping list requests down on providers that charge per operation.")
             }
         }
         .formStyle(.grouped)
@@ -437,6 +488,28 @@ struct GeneralSettingsView: View {
 struct AboutSettingsView: View {
     var body: some View {
         Form {
+            Section("ShareMaster") {
+                HStack {
+                    AsyncImage(url: URL(string: "https://github.com/conorjwryan.png")) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        Circle().fill(Color(nsColor: .quaternaryLabelColor))
+                    }
+                    .frame(width: 40, height: 40)
+                    .clipShape(Circle())
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Conor Ryan").font(.subheadline).fontWeight(.medium)
+                        Text("Development").font(.caption).foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Link("@conorjwryan", destination: URL(string: "https://x.com/conorjwryan")!)
+                        .font(.caption)
+                }
+            }
+
             Section {
                 HStack {
                     AsyncImage(url: URL(string: "https://github.com/fayazara.png")) { image in
@@ -449,31 +522,24 @@ struct AboutSettingsView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Fayaz Ahmed").font(.subheadline).fontWeight(.medium)
-                        Link("@fayazara", destination: URL(string: "https://x.com/fayazara")!).font(.caption)
+                        Text("Built on the foundation of BucketDrop")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
 
                     Spacer()
 
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text("Conor Ryan").font(.subheadline).fontWeight(.medium)
-                        Link("@conorjwryan", destination: URL(string: "https://x.com/conorjwryan")!).font(.caption)
+                        Link("@fayazara", destination: URL(string: "https://x.com/fayazara")!)
+                            .font(.caption)
+                        Link("Original project", destination: URL(string: "https://github.com/fayazara/bucketdrop")!)
+                            .font(.caption)
                     }
-
-                    AsyncImage(url: URL(string: "https://github.com/conorjwryan.png")) { image in
-                        image.resizable().scaledToFill()
-                    } placeholder: {
-                        Circle().fill(Color(nsColor: .quaternaryLabelColor))
-                    }
-                    .frame(width: 32, height: 32)
-                    .clipShape(Circle())
                 }
-
-                HStack {
-                    Spacer()
-                    Text("Made in India • Improved in Vietnam")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                }
+            } header: {
+                Text("Acknowledgements")
+            } footer: {
+                Text("Made in India • Improved in Vietnam")
+                    .frame(maxWidth: .infinity)
             }
 
             Section {
@@ -482,7 +548,7 @@ struct AboutSettingsView: View {
                 } label: {
                     HStack {
                         Spacer()
-                        Label("Quit BucketDrop", systemImage: "power")
+                        Label("Quit ShareMaster", systemImage: "power")
                         Spacer()
                     }
                 }

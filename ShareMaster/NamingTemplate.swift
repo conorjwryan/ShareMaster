@@ -1,17 +1,20 @@
 //
 //  NamingTemplate.swift
-//  BucketDrop
+//  ShareMaster
 //
 //  Expands a per-destination naming template into an object key basename.
 //  Supported tokens:
 //    {uuid}     - 8-char random hex prefix
 //    {name}     - original filename without extension
+//    {filename} - alias of {name}
 //    {ext}      - lowercased extension (without the dot)
+//    {.ext}     - lowercased extension with leading dot, empty when the file
+//                 has no extension (so templates never end in a stray dot)
 //    {date}     - yyyy-MM-dd
 //    {time}     - HHmmss
 //    {datetime} - yyyy-MM-dd-HHmmss
 //  A trailing ".{ext}" is appended automatically when the template does not
-//  already reference {ext} and the file has an extension.
+//  already reference the extension and the file has one.
 //
 
 import Foundation
@@ -19,8 +22,8 @@ import Foundation
 // Pure string helpers with no shared state, so exempt from the project's
 // default MainActor isolation (S3Service's actor calls expand()).
 nonisolated enum NamingTemplate {
-    static let allTokens = ["{uuid}", "{name}", "{ext}", "{date}", "{time}", "{datetime}"]
-    static let `default` = "{uuid}-{name}"
+    static let allTokens = ["{filename}", "{.ext}", "{uuid}", "{name}", "{ext}", "{date}", "{time}", "{datetime}"]
+    static let `default` = "{filename}{.ext}"
 
     /// Expands `template` for `filename`, returning the object key basename
     /// (no path prefix). `now` is injectable for previews/tests.
@@ -44,11 +47,13 @@ nonisolated enum NamingTemplate {
         result = result.replacingOccurrences(of: "{datetime}", with: "\(date)-\(time)")
         result = result.replacingOccurrences(of: "{date}", with: date)
         result = result.replacingOccurrences(of: "{time}", with: time)
+        result = result.replacingOccurrences(of: "{filename}", with: nameNoExt)
         result = result.replacingOccurrences(of: "{name}", with: nameNoExt)
+        result = result.replacingOccurrences(of: "{.ext}", with: ext.isEmpty ? "" : ".\(ext)")
         result = result.replacingOccurrences(of: "{ext}", with: ext)
 
         // Ensure the extension is preserved when the template didn't include it.
-        if !base.contains("{ext}"), !ext.isEmpty {
+        if !base.contains("{ext}"), !base.contains("{.ext}"), !ext.isEmpty {
             result += ".\(ext)"
         }
         return result

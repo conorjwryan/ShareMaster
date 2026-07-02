@@ -1,6 +1,6 @@
 //
 //  UploadedFile.swift
-//  BucketDrop
+//  ShareMaster
 //
 //  Created by Fayaz Ahmed Aralikatti on 12/01/26.
 //

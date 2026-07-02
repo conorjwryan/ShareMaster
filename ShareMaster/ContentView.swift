@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  BucketDrop
+//  ShareMaster
 //
 //  Created by Fayaz Ahmed Aralikatti on 12/01/26.
 //
@@ -79,23 +79,27 @@ struct ContentView: View {
                 }
             }
         }
-        .frame(width: 560, height: 460)
+        .frame(width: 560, height: config.recentsExpanded ? 460 : 250)
+        .animation(.easeInOut(duration: 0.2), value: config.recentsExpanded)
         .task {
             if selectedDestinationID == nil { selectedDestinationID = destinations.first?.id }
-            await loadRecent()
+            if config.recentsExpanded { await loadRecent() }
+        }
+        .onChange(of: config.recentsExpanded) { _, expanded in
+            if expanded { Task { await loadRecent() } }
         }
         .onChange(of: selectedDestinationID) { _, _ in
-            if config.recentScope == .perDestination {
+            if config.recentsExpanded && config.recentScope == .perDestination {
                 Task { await loadRecent() }
             }
         }
         .onChange(of: config.recentScope) { _, _ in
-            Task { await loadRecent() }
+            if config.recentsExpanded { Task { await loadRecent() } }
         }
         .onChange(of: config.destinations) { _, _ in
             // Editing a destination (public URL base, link mode, expiry, bucket…)
             // invalidates the resolved links in the recent list, so reload it.
-            Task { await loadRecent() }
+            if config.recentsExpanded { Task { await loadRecent() } }
         }
         .onReceive(NotificationCenter.default.publisher(for: .statusItemDidReceiveDrop)) { note in
             // Files dropped directly on the menu bar icon go to the current destination.
@@ -112,7 +116,7 @@ struct ContentView: View {
 
     private var header: some View {
         HStack {
-            Text("BucketDrop")
+            Text("ShareMaster")
                 .font(.headline)
             Spacer()
             HStack(spacing: 12) {
@@ -130,7 +134,7 @@ struct ContentView: View {
                     Image(systemName: "power")
                 }
                 .buttonStyle(.borderless)
-                .help("Quit BucketDrop")
+                .help("Quit ShareMaster")
             }
         }
         .padding(.horizontal, 16)
@@ -159,6 +163,27 @@ struct ContentView: View {
     // MARK: - Sidebar
 
     private var sidebar: some View {
+        ScrollViewReader { proxy in
+            sidebarList
+                .onChange(of: dropTargetID) { _, targetID in
+                    // While a drag hovers a row near the visible edge, nudge the
+                    // list so its neighbours scroll into view — lets a drag walk
+                    // up/down a destination list that doesn't fit the sidebar.
+                    guard let targetID,
+                          let index = destinations.firstIndex(where: { $0.id == targetID }) else { return }
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        if index + 1 < destinations.count {
+                            proxy.scrollTo(destinations[index + 1].id)
+                        }
+                        if index > 0 {
+                            proxy.scrollTo(destinations[index - 1].id)
+                        }
+                    }
+                }
+        }
+    }
+
+    private var sidebarList: some View {
         List(selection: $selectedDestinationID) {
             ForEach(destinations) { destination in
                 DestinationRow(
@@ -242,27 +267,43 @@ struct ContentView: View {
     private var recentList: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text(config.recentScope == .combined ? "Recent Uploads (All)" : "Recent Uploads")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if isLoadingList {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Button {
-                        Task { await loadRecent() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
+                // Collapsible: recents only load (and list requests only fire)
+                // while this section is expanded.
+                Button {
+                    config.recentsExpanded.toggle()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .rotationEffect(.degrees(config.recentsExpanded ? 90 : 0))
+                        Text(config.recentScope == .combined ? "Recent Uploads (All)" : "Recent Uploads")
+                            .font(.subheadline)
                     }
-                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                Spacer()
+                if config.recentsExpanded {
+                    if isLoadingList {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Button {
+                            Task { await loadRecent() }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .buttonStyle(.borderless)
+                    }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .background(Color(nsColor: .windowBackgroundColor))
 
-            if recentItems.isEmpty && !isLoadingList {
+            if !config.recentsExpanded {
+                EmptyView()
+            } else if recentItems.isEmpty && !isLoadingList {
                 VStack {
                     Text("No files yet")
                         .font(.caption)
@@ -395,10 +436,15 @@ struct ContentView: View {
                 uploadedURLs.append(result.url)
 
                 // Optimistically add to the list when it belongs to the current view.
-                let visible = config.recentScope == .combined || destination.id == selectedDestination?.id
+                // Skip while collapsed — the list reloads fresh on next expand.
+                let visible = config.recentsExpanded &&
+                    (config.recentScope == .combined || destination.id == selectedDestination?.id)
                 if visible {
                     let newObject = S3Object(key: result.key, size: fileSize, lastModified: Date())
                     recentItems.insert(RecentItem(object: newObject, destination: destination, link: result.url), at: 0)
+                    if recentItems.count > config.recentLimit {
+                        recentItems.removeLast(recentItems.count - config.recentLimit)
+                    }
                 }
 
             } catch {
@@ -445,7 +491,8 @@ struct ContentView: View {
             }
             do {
                 let objects = try await S3Service.shared.listObjects(config: cfg)
-                recentItems = await resolveItems(objects, destination: destination, config: cfg)
+                let limited = Array(objects.prefix(config.recentLimit))
+                recentItems = await resolveItems(limited, destination: destination, config: cfg)
             } catch {
                 errorMessage = error.localizedDescription
                 recentItems = []
@@ -458,14 +505,18 @@ struct ContentView: View {
             var merged: [RecentItem] = []
             await withTaskGroup(of: [RecentItem].self) { group in
                 for (dest, cfg) in targets {
-                    group.addTask {
+                    group.addTask { [limit = config.recentLimit] in
                         guard let objects = try? await S3Service.shared.listObjects(config: cfg) else { return [] }
-                        return await self.resolveItems(objects, destination: dest, config: cfg)
+                        let limited = Array(objects.prefix(limit))
+                        return await self.resolveItems(limited, destination: dest, config: cfg)
                     }
                 }
                 for await items in group { merged.append(contentsOf: items) }
             }
-            recentItems = merged.sorted { $0.object.lastModified > $1.object.lastModified }
+            recentItems = Array(
+                merged.sorted { $0.object.lastModified > $1.object.lastModified }
+                    .prefix(config.recentLimit)
+            )
         }
     }
 
@@ -509,7 +560,7 @@ struct ContentView: View {
     // MARK: - Cache
 
     private func cachedFileURL(for object: S3Object) -> URL {
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("BucketDrop")
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("ShareMaster")
         try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         return tempDir.appendingPathComponent((object.key as NSString).lastPathComponent)
     }
