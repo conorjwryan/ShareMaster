@@ -413,9 +413,20 @@ struct ContentView: View {
             NSPasteboard.general.setString(uploadedURLs.joined(separator: "\n"), forType: .string)
         }
 
+        let allSucceeded = uploadTasks.allSatisfy {
+            if case .completed = $0.status { return true }
+            return false
+        }
+
         try? await Task.sleep(for: .seconds(2))
         uploadTasks = []
         isUploading = false
+
+        NotificationCenter.default.post(
+            name: .uploadDidFinish,
+            object: nil,
+            userInfo: ["success": allSucceeded]
+        )
     }
 
     // MARK: - Loading

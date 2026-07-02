@@ -44,6 +44,10 @@ extension Notification.Name {
     /// Posted when files are dropped directly on the menu bar icon.
     /// userInfo: ["urls": [URL]]
     static let statusItemDidReceiveDrop = Notification.Name("BucketDrop.statusItemDidReceiveDrop")
+
+    /// Posted when an upload batch finishes and its confirmation has been shown.
+    /// userInfo: ["success": Bool]
+    static let uploadDidFinish = Notification.Name("BucketDrop.uploadDidFinish")
 }
 
 /// Transparent overlay on the status item button that accepts file drags.
@@ -86,6 +90,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var modelContainer: ModelContainer?
     var settingsWindow: NSWindow?
     var popoverBackgroundView: PopoverBackgroundView?
+    /// True while the popover is open because a drag hovered over the menu bar
+    /// icon (rather than a click). Used to auto-close it once the upload ends.
+    private var popoverOpenedByDrag = false
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Hide dock icon
@@ -109,9 +116,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let dragView = StatusItemDragView(frame: button.bounds)
             dragView.autoresizingMask = [.width, .height]
             dragView.onDragEntered = { [weak self] in
-                self?.showPopover()
+                guard let self else { return }
+                if self.popover?.isShown != true {
+                    self.popoverOpenedByDrag = true
+                    self.showPopover()
+                }
             }
             button.addSubview(dragView)
+        }
+
+        // Close a drag-opened popover once the upload has finished (and its
+        // confirmation has been shown), so it doesn't linger.
+        NotificationCenter.default.addObserver(
+            forName: .uploadDidFinish, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let self, self.popoverOpenedByDrag else { return }
+            let success = note.userInfo?["success"] as? Bool ?? true
+            if success {
+                self.popover?.performClose(nil)
+            }
+            self.popoverOpenedByDrag = false
         }
         
         // Setup popover
@@ -126,6 +150,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.openSettings()
             })
         popover?.contentViewController = NSHostingController(rootView: contentView)
+
+        // If a drag-opened popover is dismissed some other way (click outside,
+        // drag abandoned), clear the flag so a later click-opened popover
+        // doesn't auto-close after an unrelated upload.
+        NotificationCenter.default.addObserver(
+            forName: NSPopover.didCloseNotification, object: popover, queue: .main
+        ) { [weak self] _ in
+            self?.popoverOpenedByDrag = false
+        }
     }
     
     @objc func togglePopover() {
@@ -134,6 +167,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            popoverOpenedByDrag = false
             showPopover()
         }
     }
