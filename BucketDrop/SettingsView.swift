@@ -100,13 +100,32 @@ struct SettingsView: View {
                         Link("@fayazara", destination: URL(string: "https://x.com/fayazara")!)
                             .font(.caption)
                     }
-                    
+
                     Spacer()
+
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Conor Ryan")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Link("@conorjwryan", destination: URL(string: "https://x.com/conorjwryan")!)
+                            .font(.caption)
+                    }
+
+                    AsyncImage(url: URL(string: "https://github.com/conorjwryan.png")) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        Circle()
+                            .fill(Color(nsColor: .quaternaryLabelColor))
+                    }
+                    .frame(width: 32, height: 32)
+                    .clipShape(Circle())
                 }
-                
+
                 HStack {
                     Spacer()
-                    Text("Made in India")
+                    Text("Made in India • Improved in Vietnam")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
