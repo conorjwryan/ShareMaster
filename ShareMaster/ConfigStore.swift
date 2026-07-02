@@ -50,15 +50,29 @@ struct Destination: Codable, Identifiable, Hashable {
     var uploadCapMBps: Double? = nil
     var downloadCapMBps: Double? = nil
     var maxConcurrentParts: Int? = nil
-    /// Security-scoped bookmark of a custom download folder (nil = the user's
-    /// Downloads folder). Stored as a bookmark because the app is sandboxed.
+    /// Where downloads land (nil = .downloads, or .custom when a bookmark was
+    /// saved before this field existed). Option-clicking the download button
+    /// always shows a save panel regardless of this setting.
+    var downloadLocation: DownloadLocation? = nil
+    /// Security-scoped bookmark of the custom download folder. Stored as a
+    /// bookmark because the app is sandboxed.
     var downloadDirBookmark: Data? = nil
+
+    nonisolated var effectiveDownloadLocation: DownloadLocation {
+        downloadLocation ?? (downloadDirBookmark != nil ? .custom : .downloads)
+    }
 }
 
 enum RecentScope: String, Codable, CaseIterable, Identifiable {
     case perDestination
     case combined
     var id: String { rawValue }
+}
+
+enum DownloadLocation: String, Codable {
+    case downloads   // the user's Downloads folder
+    case custom      // the folder in downloadDirBookmark
+    case ask         // save panel on every download
 }
 
 /// Fully-resolved config handed to S3Service so it never reads any singleton.
@@ -247,7 +261,8 @@ final class ConfigStore {
     /// Resolves a destination's download folder. Returns the URL plus whether
     /// it is security-scoped (caller must start/stop accessing around use).
     nonisolated static func downloadDirectory(for destination: Destination) -> (url: URL, isScoped: Bool) {
-        if let data = destination.downloadDirBookmark {
+        if destination.effectiveDownloadLocation == .custom,
+           let data = destination.downloadDirBookmark {
             var stale = false
             if let url = try? URL(
                 resolvingBookmarkData: data,

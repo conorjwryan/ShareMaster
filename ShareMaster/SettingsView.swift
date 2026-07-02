@@ -381,20 +381,33 @@ struct DestinationEditor: View {
             }
 
             Section {
-                LabeledContent("Save downloads to") {
-                    Text(downloadFolderLabel)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-                HStack {
-                    Button("Choose Folder…") { chooseDownloadFolder() }
-                    if destination.downloadDirBookmark != nil {
-                        Button("Use Downloads Folder") { destination.downloadDirBookmark = nil }
+                Picker("Save downloads to", selection: Binding(
+                    get: { destination.effectiveDownloadLocation },
+                    set: { newValue in
+                        destination.downloadLocation = newValue
+                        if newValue == .custom && destination.downloadDirBookmark == nil {
+                            chooseDownloadFolder()
+                        }
                     }
+                )) {
+                    Text("Downloads folder").tag(DownloadLocation.downloads)
+                    Text("Custom folder").tag(DownloadLocation.custom)
+                    Text("Choose every time").tag(DownloadLocation.ask)
+                }
+
+                if destination.effectiveDownloadLocation == .custom {
+                    LabeledContent("Folder") {
+                        Text(downloadFolderLabel)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    Button("Choose Folder…") { chooseDownloadFolder() }
                 }
             } header: {
                 Text("Downloads")
+            } footer: {
+                Text("Option-click a file's download button to choose the location for that download, whatever this is set to.")
             }
 
             Section {

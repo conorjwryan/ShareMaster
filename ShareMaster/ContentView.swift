@@ -335,8 +335,8 @@ struct ContentView: View {
                                 copyToClipboard(item)
                             } onDelete: {
                                 await deleteObject(item)
-                            } onDownload: {
-                                await downloadToDownloads(item)
+                            } onDownload: { choosePanel in
+                                await downloadToDownloads(item, forcePanel: choosePanel)
                             } onPreview: {
                                 previewFile(item)
                             }
@@ -586,17 +586,34 @@ struct ContentView: View {
 
     // MARK: - Download
 
-    /// Saves straight into the destination's download folder (its custom
-    /// folder when set, otherwise ~/Downloads) — no save panel.
-    private func downloadToDownloads(_ item: RecentItem) async {
+    /// Saves into the destination's download folder (custom folder or
+    /// ~/Downloads). "Choose every time" destinations — and any option-click
+    /// on the download button — show a save panel instead.
+    private func downloadToDownloads(_ item: RecentItem, forcePanel: Bool = false) async {
         guard let cfg = config.s3Config(for: item.destination) else { return }
         let object = item.object
 
-        let (folder, isScoped) = ConfigStore.downloadDirectory(for: item.destination)
-        let accessing = isScoped && folder.startAccessingSecurityScopedResource()
-        defer { if accessing { folder.stopAccessingSecurityScopedResource() } }
+        let target: URL
+        var scopedFolder: URL?
 
-        let target = uniqueTarget(in: folder, filename: object.filename)
+        if forcePanel || item.destination.effectiveDownloadLocation == .ask {
+            let savePanel = NSSavePanel()
+            savePanel.nameFieldStringValue = object.filename
+            savePanel.canCreateDirectories = true
+            savePanel.isExtensionHidden = false
+            NSApp.activate(ignoringOtherApps: true)
+            guard await savePanel.begin() == .OK, let chosen = savePanel.url else { return }
+            // Panel already confirmed replacement, so clear the way.
+            try? FileManager.default.removeItem(at: chosen)
+            target = chosen
+        } else {
+            let (folder, isScoped) = ConfigStore.downloadDirectory(for: item.destination)
+            if isScoped, folder.startAccessingSecurityScopedResource() {
+                scopedFolder = folder
+            }
+            target = uniqueTarget(in: folder, filename: object.filename)
+        }
+        defer { scopedFolder?.stopAccessingSecurityScopedResource() }
 
         if let cachedURL = getCachedFile(for: object) {
             do {
@@ -949,7 +966,8 @@ struct FileRowView: View {
     let downloadProgress: Double
     let onCopy: () -> Void
     let onDelete: () async -> Void
-    let onDownload: () async -> Void
+    /// The Bool is true when the user option-clicked (choose location).
+    let onDownload: (Bool) async -> Void
     let onPreview: () -> Void
 
     @State private var isHovered = false
@@ -1038,13 +1056,14 @@ struct FileRowView: View {
                 .disabled(isDeleting || isDownloading)
 
                 Button {
-                    Task { await onDownload() }
+                    let choosePanel = NSApp.currentEvent?.modifierFlags.contains(.option) ?? false
+                    Task { await onDownload(choosePanel) }
                 } label: {
                     Image(systemName: "arrow.down.circle")
                         .foregroundStyle(Color.secondary)
                 }
                 .buttonStyle(.borderless)
-                .help("Download")
+                .help("Download (⌥-click to choose location)")
                 .disabled(isDeleting || isDownloading)
 
                 Button {
