@@ -4,12 +4,16 @@ ShareMaster is a macOS menu bar app for uploading files to S3-compatible storage
 
 ## Features
 
-- Drag & drop onto the menu bar icon — the popover opens mid-drag so you can pick a destination
-- Multiple accounts and destinations (bucket + path + naming template + link options)
-- Multipart uploads and ranged downloads with configurable concurrency
-- Optional upload/download bandwidth caps (per account, with per-destination overrides)
+- Drag & drop onto the menu bar icon — the popover opens mid-drag so you can drop straight onto a destination
+- Multiple accounts and destinations (bucket + path prefix + naming template + link options)
+- Customizable naming templates (`{filename}`, `{uuid}`, `{date}`, `{time}`, and more)
+- Multipart uploads and concurrent ranged downloads with configurable parallelism
+- Optional upload/download bandwidth caps, set per account with per-destination overrides
 - Public or presigned share links, copied to your clipboard automatically
 - Quick Look preview, download, and delete for recent uploads
+- Per-destination download folders, with ⌥-click or an "ask every time" mode to choose on the fly
+- Credentials stored in the macOS Keychain, not in plain config
+- Lightweight footprint — the popover loads on demand and releases memory when idle
 - Works with AWS S3, Cloudflare R2, MinIO, and other S3-compatible services
 
 ## Installation
@@ -30,6 +34,7 @@ ShareMaster is a macOS menu bar app for uploading files to S3-compatible storage
 - **Click** the drop zone to select files from Finder
 - **Double-click** a recent file to preview with Quick Look
 - **Hover** over a file to see action buttons (copy link, download, delete)
+- **⌥-click** a file's download button to choose the save location for that download
 
 ## Requirements
 
