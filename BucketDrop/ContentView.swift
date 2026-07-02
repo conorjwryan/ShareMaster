@@ -45,6 +45,7 @@ struct ContentView: View {
     var config = ConfigStore.shared
 
     @State private var selectedDestinationID: UUID?
+    @State private var dropTargetID: UUID?
     @State private var isTargeted = false
     @State private var isUploading = false
     @State private var uploadTasks: [UploadTask] = []
@@ -95,6 +96,15 @@ struct ContentView: View {
             // Editing a destination (public URL base, link mode, expiry, bucket…)
             // invalidates the resolved links in the recent list, so reload it.
             Task { await loadRecent() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .statusItemDidReceiveDrop)) { note in
+            // Files dropped directly on the menu bar icon go to the current destination.
+            guard !isUploading,
+                  let urls = note.userInfo?["urls"] as? [URL],
+                  let destination = selectedDestination else { return }
+            Task { @MainActor in
+                await uploadFiles(urls, to: destination)
+            }
         }
     }
 
@@ -153,12 +163,25 @@ struct ContentView: View {
             ForEach(destinations) { destination in
                 DestinationRow(
                     destination: destination,
-                    accountName: config.account(id: destination.accountId)?.name ?? "—"
+                    accountName: config.account(id: destination.accountId)?.name ?? "—",
+                    isDropTarget: dropTargetID == destination.id
                 )
                 .tag(destination.id)
-                .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+                .onDrop(of: [.fileURL], isTargeted: Binding(
+                    get: { dropTargetID == destination.id },
+                    set: { targeted in
+                        if targeted {
+                            dropTargetID = destination.id
+                        } else if dropTargetID == destination.id {
+                            dropTargetID = nil
+                        }
+                    }
+                )) { providers in
                     guard !isUploading else { return false }
                     NSApp.activate(ignoringOtherApps: true)
+                    // Move focus to the destination that received the drop so the
+                    // right side reflects where the files went.
+                    selectedDestinationID = destination.id
                     handleDrop(providers, to: destination)
                     return true
                 }
@@ -591,19 +614,30 @@ struct ContentView: View {
 struct DestinationRow: View {
     let destination: Destination
     let accountName: String
+    var isDropTarget: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(destination.name.isEmpty ? "Untitled" : destination.name)
                 .font(.system(.subheadline).weight(.medium))
+                .foregroundStyle(isDropTarget ? .white : .primary)
                 .lineLimit(1)
             Text(subtitle)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(isDropTarget ? Color.white.opacity(0.85) : Color.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
         .padding(.vertical, 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            // Mimics the sidebar selection pill while a drag hovers over the row.
+            RoundedRectangle(cornerRadius: 5)
+                .fill(isDropTarget ? Color.accentColor : Color.clear)
+                .padding(.horizontal, -7)
+                .padding(.vertical, -3)
+        )
+        .animation(.easeInOut(duration: 0.1), value: isDropTarget)
     }
 
     private var subtitle: String {
