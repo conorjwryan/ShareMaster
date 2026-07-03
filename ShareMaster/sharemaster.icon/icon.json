@@ -1,55 +1,33 @@
 {
   "fill" : {
-    "automatic-gradient" : "extended-srgb:0.00000,0.53333,1.00000,1.00000",
-    "orientation" : {
-      "start" : {
-        "x" : 0.5,
-        "y" : 0
-      },
-      "stop" : {
-        "x" : 0.5,
-        "y" : 0.7
-      }
-    }
+    "automatic-gradient" : "extended-srgb:0.00000,0.75294,0.90980,1.00000"
   },
   "groups" : [
     {
       "layers" : [
         {
-          "image-name" : "image-RTVQQIPYu3lrFTsh2V0AA6Ruwo01aO.png",
-          "name" : "image-RTVQQIPYu3lrFTsh2V0AA6Ruwo01aO",
+          "glass" : false,
+          "hidden" : false,
+          "image-name" : "sharemaster-paper-plane-transparent.png",
+          "name" : "sharemaster-paper-plane-transparent",
           "position" : {
-            "scale" : 1,
+            "scale" : 0.4,
             "translation-in-points" : [
-              -16.6875,
-              58
+              161.54218750000007,
+              -235.04062499999998
             ]
           }
-        }
-      ],
-      "name" : "Group",
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
-      },
-      "specular" : false,
-      "translucency" : {
-        "enabled" : false,
-        "value" : 0.5
-      }
-    },
-    {
-      "layers" : [
+        },
         {
           "glass" : false,
-          "image-name" : "Image 2.png",
-          "name" : "Image 2",
-          "opacity" : 0.5,
+          "hidden" : false,
+          "image-name" : "sharemaster-box-transparent.png",
+          "name" : "sharemaster-box-transparent",
           "position" : {
-            "scale" : 0.5,
+            "scale" : 0.55,
             "translation-in-points" : [
-              0,
-              0
+              -161.7578125,
+              204.3828125
             ]
           }
         }
@@ -58,7 +36,6 @@
         "kind" : "neutral",
         "opacity" : 0.5
       },
-      "specular" : false,
       "translucency" : {
         "enabled" : true,
         "value" : 0.5
@@ -66,8 +43,9 @@
     }
   ],
   "supported-platforms" : {
-    "squares" : [
-      "macOS"
-    ]
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
   }
 }
