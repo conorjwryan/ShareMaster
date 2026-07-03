@@ -32,6 +32,9 @@ struct DestinationListView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
+                    UploadMenu()
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showSettings = true
                     } label: {

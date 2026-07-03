@@ -47,6 +47,13 @@ struct BucketBrowserView: View {
         }
         .navigationTitle(destination.name.isEmpty ? destination.bucket : destination.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                UploadMenu(destination: destination) {
+                    Task { await refresh() }
+                }
+            }
+        }
         .task { await refresh() }
         .refreshable { await refresh() }
         .sheet(item: $selectedObject) { object in
