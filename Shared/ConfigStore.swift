@@ -109,7 +109,15 @@ extension S3Config {
 final class ConfigStore {
     static let shared = ConfigStore()
 
+    /// App Group shared between the iOS app and its share extension so both
+    /// see the same accounts/destinations. Unused on macOS.
+    nonisolated static let appGroupID = "group.com.cjwr.ShareMaster"
+
+    #if os(iOS)
+    private let defaults = UserDefaults(suiteName: ConfigStore.appGroupID) ?? .standard
+    #else
     private let defaults = UserDefaults.standard
+    #endif
     private let keychainService = "com.cjwr.ShareMaster"
 
     private enum Keys {
@@ -258,6 +266,7 @@ final class ConfigStore {
         keychainGet(key: secretKey(accountId)) ?? ""
     }
 
+    #if os(macOS)
     /// Resolves a destination's download folder. Returns the URL plus whether
     /// it is security-scoped (caller must start/stop accessing around use).
     nonisolated static func downloadDirectory(for destination: Destination) -> (url: URL, isScoped: Bool) {
@@ -277,6 +286,7 @@ final class ConfigStore {
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Downloads")
         return (downloads, false)
     }
+    #endif
 
     /// Deletes an account only if no destinations reference it.
     @discardableResult
@@ -361,25 +371,37 @@ final class ConfigStore {
 
     // MARK: - Keychain
 
-    private func keychainSet(key: String, value: String) {
-        let query: [String: Any] = [
+    /// Base query shared by all keychain operations. On iOS the items are
+    /// stored in the App Group access group so the share extension can read
+    /// the same credentials as the app.
+    private func keychainBaseQuery(key: String) -> [String: Any] {
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
             kSecAttrService as String: keychainService
         ]
+        #if os(iOS)
+        query[kSecAttrAccessGroup as String] = Self.appGroupID
+        #endif
+        return query
+    }
+
+    private func keychainSet(key: String, value: String) {
+        let query = keychainBaseQuery(key: key)
         SecItemDelete(query as CFDictionary)
         var newQuery = query
         newQuery[kSecValueData as String] = value.data(using: .utf8)!
+        #if os(iOS)
+        // Readable by the share extension while the device is locked
+        // (e.g. sharing right after a screenshot on the lock screen).
+        newQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        #endif
         SecItemAdd(newQuery as CFDictionary, nil)
     }
 
     private func keychainGet(key: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key,
-            kSecAttrService as String: keychainService,
-            kSecReturnData as String: true
-        ]
+        var query = keychainBaseQuery(key: key)
+        query[kSecReturnData as String] = true
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         guard status == errSecSuccess, let data = result as? Data else { return nil }
@@ -387,11 +409,6 @@ final class ConfigStore {
     }
 
     private func keychainDelete(key: String) {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key,
-            kSecAttrService as String: keychainService
-        ]
-        SecItemDelete(query as CFDictionary)
+        SecItemDelete(keychainBaseQuery(key: key) as CFDictionary)
     }
 }

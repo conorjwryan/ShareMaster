@@ -6,9 +6,56 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		31FBD5402F156DC80052B2FE /* ShareMasterShareExt.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 31FBD5112F156DC80052B2FE /* ShareMasterShareExt.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		31FBD5412F156DC80052B2FE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 31FBD3092F156DC80052B2FE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 31FBD5212F156DC80052B2FE;
+			remoteInfo = ShareMasterShareExt;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		31FBD5332F156DC80052B2FE /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				31FBD5402F156DC80052B2FE /* ShareMasterShareExt.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		31FBD3112F156DC80052B2FE /* ShareMaster.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShareMaster.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		31FBD5102F156DC80052B2FE /* ShareMasterIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShareMasterIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		31FBD5112F156DC80052B2FE /* ShareMasterShareExt.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareMasterShareExt.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		31FBD5032F156DC80052B2FE /* Exceptions for "ShareMasterShareExt" folder in "ShareMasterShareExt" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 31FBD5212F156DC80052B2FE /* ShareMasterShareExt */;
+		};
+		31FBD5042F156DC80052B2FE /* Exceptions for "Shared" folder in "ShareMasterShareExt" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				sharemaster.icon,
+			);
+			target = 31FBD5212F156DC80052B2FE /* ShareMasterShareExt */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		31FBD3132F156DC80052B2FE /* ShareMaster */ = {
@@ -16,10 +63,45 @@
 			path = ShareMaster;
 			sourceTree = "<group>";
 		};
+		31FBD5002F156DC80052B2FE /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				31FBD5042F156DC80052B2FE /* Exceptions for "Shared" folder in "ShareMasterShareExt" target */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		31FBD5012F156DC80052B2FE /* ShareMasterIOS */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ShareMasterIOS;
+			sourceTree = "<group>";
+		};
+		31FBD5022F156DC80052B2FE /* ShareMasterShareExt */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				31FBD5032F156DC80052B2FE /* Exceptions for "ShareMasterShareExt" folder in "ShareMasterShareExt" target */,
+			);
+			path = ShareMasterShareExt;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		31FBD30E2F156DC80052B2FE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		31FBD5312F156DC80052B2FE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		31FBD5352F156DC80052B2FE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +115,9 @@
 			isa = PBXGroup;
 			children = (
 				31FBD3132F156DC80052B2FE /* ShareMaster */,
+				31FBD5002F156DC80052B2FE /* Shared */,
+				31FBD5012F156DC80052B2FE /* ShareMasterIOS */,
+				31FBD5022F156DC80052B2FE /* ShareMasterShareExt */,
 				31FBD3122F156DC80052B2FE /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +126,8 @@
 			isa = PBXGroup;
 			children = (
 				31FBD3112F156DC80052B2FE /* ShareMaster.app */,
+				31FBD5102F156DC80052B2FE /* ShareMasterIOS.app */,
+				31FBD5112F156DC80052B2FE /* ShareMasterShareExt.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -62,6 +149,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				31FBD3132F156DC80052B2FE /* ShareMaster */,
+				31FBD5002F156DC80052B2FE /* Shared */,
 			);
 			name = ShareMaster;
 			packageProductDependencies = (
@@ -69,6 +157,54 @@
 			productName = ShareMaster;
 			productReference = 31FBD3112F156DC80052B2FE /* ShareMaster.app */;
 			productType = "com.apple.product-type.application";
+		};
+		31FBD5202F156DC80052B2FE /* ShareMasterIOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 31FBD5502F156DC80052B2FE /* Build configuration list for PBXNativeTarget "ShareMasterIOS" */;
+			buildPhases = (
+				31FBD5302F156DC80052B2FE /* Sources */,
+				31FBD5312F156DC80052B2FE /* Frameworks */,
+				31FBD5322F156DC80052B2FE /* Resources */,
+				31FBD5332F156DC80052B2FE /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				31FBD5422F156DC80052B2FE /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				31FBD5002F156DC80052B2FE /* Shared */,
+				31FBD5012F156DC80052B2FE /* ShareMasterIOS */,
+			);
+			name = ShareMasterIOS;
+			packageProductDependencies = (
+			);
+			productName = ShareMasterIOS;
+			productReference = 31FBD5102F156DC80052B2FE /* ShareMasterIOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		31FBD5212F156DC80052B2FE /* ShareMasterShareExt */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 31FBD5532F156DC80052B2FE /* Build configuration list for PBXNativeTarget "ShareMasterShareExt" */;
+			buildPhases = (
+				31FBD5342F156DC80052B2FE /* Sources */,
+				31FBD5352F156DC80052B2FE /* Frameworks */,
+				31FBD5362F156DC80052B2FE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				31FBD5002F156DC80052B2FE /* Shared */,
+				31FBD5022F156DC80052B2FE /* ShareMasterShareExt */,
+			);
+			name = ShareMasterShareExt;
+			packageProductDependencies = (
+			);
+			productName = ShareMasterShareExt;
+			productReference = 31FBD5112F156DC80052B2FE /* ShareMasterShareExt.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -100,12 +236,28 @@
 			projectRoot = "";
 			targets = (
 				31FBD3102F156DC80052B2FE /* ShareMaster */,
+				31FBD5202F156DC80052B2FE /* ShareMasterIOS */,
+				31FBD5212F156DC80052B2FE /* ShareMasterShareExt */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		31FBD30F2F156DC80052B2FE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		31FBD5322F156DC80052B2FE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		31FBD5362F156DC80052B2FE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +274,29 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		31FBD5302F156DC80052B2FE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		31FBD5342F156DC80052B2FE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		31FBD5422F156DC80052B2FE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 31FBD5212F156DC80052B2FE /* ShareMasterShareExt */;
+			targetProxy = 31FBD5412F156DC80052B2FE /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		31FBD31C2F156DC90052B2FE /* Debug */ = {
@@ -349,6 +523,142 @@
 			};
 			name = Release;
 		};
+		31FBD5512F156DC80052B2FE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = sharemaster;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ShareMasterIOS/ShareMasterIOS.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HU9TH52NNC;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = ShareMaster;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cjwr.ShareMasterIOS;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		31FBD5522F156DC80052B2FE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = sharemaster;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ShareMasterIOS/ShareMasterIOS.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HU9TH52NNC;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = ShareMaster;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cjwr.ShareMasterIOS;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		31FBD5542F156DC80052B2FE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareMasterShareExt/ShareMasterShareExt.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HU9TH52NNC;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ShareMasterShareExt/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShareMaster;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cjwr.ShareMasterIOS.ShareExt;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		31FBD5552F156DC80052B2FE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareMasterShareExt/ShareMasterShareExt.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HU9TH52NNC;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ShareMasterShareExt/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShareMaster;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cjwr.ShareMasterIOS.ShareExt;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -366,6 +676,24 @@
 			buildConfigurations = (
 				31FBD31F2F156DC90052B2FE /* Debug */,
 				31FBD3202F156DC90052B2FE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		31FBD5502F156DC80052B2FE /* Build configuration list for PBXNativeTarget "ShareMasterIOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				31FBD5512F156DC80052B2FE /* Debug */,
+				31FBD5522F156DC80052B2FE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		31FBD5532F156DC80052B2FE /* Build configuration list for PBXNativeTarget "ShareMasterShareExt" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				31FBD5542F156DC80052B2FE /* Debug */,
+				31FBD5552F156DC80052B2FE /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
