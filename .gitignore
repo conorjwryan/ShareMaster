@@ -1,5 +1,13 @@
+# ShareMaster GitIgnore
+
 .DS_Store
+
+# Directories
 .build/
 xcuserdata/
 DerivedData/
+dist/
+
+# File Types
 *.xcuserstate
+

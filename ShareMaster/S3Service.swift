@@ -2,8 +2,7 @@
 //  S3Service.swift
 //  ShareMaster
 //
-//  Created by Fayaz Ahmed Aralikatti on 12/01/26.
-//
+//  Created by Conor Ryan on 02/07/26.
 
 import Foundation
 import CryptoKit
