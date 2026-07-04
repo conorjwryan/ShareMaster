@@ -36,6 +36,15 @@ struct IOSSettingsView: View {
                     Text("With Mobile Data off, files upload only over Wi-Fi — browsing, previews, and copying links work anywhere. With it on, you'll see how much data an upload will use before it starts, unless warnings are skipped. iCloud Sync shares your accounts and destinations between devices through iCloud Keychain.")
                 }
 
+                Section {
+                    Toggle("Full-Size Image Previews", isOn: $config.rendersFullImagePreviews)
+                    Toggle("Tap to Preview on Mobile Data", isOn: $config.requiresTapForCellularPreviews)
+                } header: {
+                    Text("Previews")
+                } footer: {
+                    Text("Full-size previews decode the original image instead of a smaller display copy. On mobile data, tap-to-preview stops images from downloading until you choose to load them.")
+                }
+
                 // Both sections filter through the wordmark reveal: with it
                 // off, hidden destinations and their dedicated accounts are
                 // absent here too, so Settings looks like an ordinary setup.

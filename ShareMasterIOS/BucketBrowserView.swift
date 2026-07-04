@@ -284,8 +284,11 @@ struct ObjectDetailView: View {
 private struct RemoteImagePreview: View {
     let url: URL
 
+    @State private var config = ConfigStore.shared
+    @State private var network = NetworkMonitor.shared
     @State private var image: Image?
     @State private var isLoading = false
+    @State private var didRequestPreview = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -299,6 +302,26 @@ private struct RemoteImagePreview: View {
                 previewNotice(title: "Preview unavailable", message: errorMessage)
             } else if isLoading {
                 ProgressView()
+            } else if shouldWaitForTap {
+                VStack(spacing: 10) {
+                    Image(systemName: "photo")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                    Text("Image preview")
+                        .font(.subheadline.weight(.semibold))
+                    Text("This image will download over mobile data.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button {
+                        didRequestPreview = true
+                        Task { await load() }
+                    } label: {
+                        Label("Preview", systemImage: "eye")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding()
             } else {
                 previewNotice(title: "Preview unavailable", message: "The image preview could not be loaded.")
             }
@@ -308,8 +331,15 @@ private struct RemoteImagePreview: View {
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .task(id: url) {
-            await load()
+            didRequestPreview = false
+            if !shouldWaitForTap {
+                await load()
+            }
         }
+    }
+
+    private var shouldWaitForTap: Bool {
+        config.requiresTapForCellularPreviews && network.isOnCellular && !didRequestPreview
     }
 
     private func previewNotice(title: String, message: String) -> some View {
@@ -343,7 +373,11 @@ private struct RemoteImagePreview: View {
                 return
             }
 
-            guard let uiImage = Self.downsampledImage(from: data, maxPixel: 1200) else {
+            let uiImage = config.rendersFullImagePreviews
+                ? UIImage(data: data)
+                : Self.downsampledImage(from: data, maxPixel: 1200)
+
+            guard let uiImage else {
                 errorMessage = "The link did not return a supported image."
                 return
             }

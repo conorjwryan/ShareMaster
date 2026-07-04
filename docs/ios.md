@@ -10,7 +10,7 @@ On iOS, `ConfigStore` reads/writes the App Group `group.com.cjwr.ShareMaster` fo
 
 - `ShareMasterIOSApp.swift` — entry point; also warms `NetworkMonitor` at launch (see below).
 - `DestinationListView` — root list of destinations → navigates to `BucketBrowserView` (browse objects, copy links, delete). The `NavigationStack` here carries the upload status bar and all upload alerts.
-- `IOSSettingsView` — account/destination editors (with Duplicate), account transfer defaults, per-destination transfer overrides, Sync section, cellular toggles.
+- `IOSSettingsView` — account/destination editors (with Duplicate), account transfer defaults, per-destination transfer overrides, Sync section, cellular and preview toggles.
 - `UploadMenu` — the toolbar "+": Photo Library (PhotosPicker/`Transferable`, copied to a temp file) and Files (`fileImporter`, security-scoped temp copy).
 - `UploadManager` — see next section.
 
@@ -24,12 +24,13 @@ On iOS, `ConfigStore` reads/writes the App Group `group.com.cjwr.ShareMaster` fo
 
 ## Mobile-data gating
 
-iOS-app-only, uploads-only (browsing, previews, and link-copying are never gated; the app has no file-download feature yet). Controlled by the device-local settings `allowsCellularUploads` (default on) and `suppressCellularWarnings` (default off).
+iOS-app-only, uploads-only for transfer blocking (browsing and link-copying are never gated; the app has no file-download feature yet). Controlled by the device-local settings `allowsCellularUploads` (default on) and `suppressCellularWarnings` (default off). Image previews have their own device-local controls: `rendersFullImagePreviews` (default off, decode a bounded display copy) and `requiresTapForCellularPreviews` (default on, show a Preview button before fetching image bytes on mobile data).
 
 - `NetworkMonitor` (an `@Observable` `NWPathMonitor` wrapper in `UploadManager.swift`) **must be warmed at launch** — it's touched in `UploadManager.init` because the first path reading is asynchronous, so a lazily created monitor always reports "not cellular".
 - On cellular, `UploadManager.start` either shows an "Uploading on Mobile Data Is Disabled" alert (toggle off) or a "~X MB of your mobile data plan" Continue/Cancel prompt (toggle on, warnings not suppressed).
 - Enforcement backstop: `S3Config.allowsCellular` → `allowsCellularAccess` on the upload requests; a resulting `URLError` (`.dataNotAllowed` etc.) while gated is mapped to the friendly disabled alert in `UploadManager.run()`.
 - The share extension has **no gate UI** — when uploads are disallowed on cellular it simply fails at the network level.
+- On cellular, `RemoteImagePreview` waits for an explicit tap before it downloads the image unless `requiresTapForCellularPreviews` is off. Wi-Fi previews still load automatically. The full-size preview toggle only changes decode size, not object download size.
 
 ## Hidden destinations ("decoy mode")
 

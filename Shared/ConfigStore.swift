@@ -195,6 +195,8 @@ final class ConfigStore {
         static let cloudUpdatedAt = "config_cloud_updated_at"
         static let cellularUploads = "config_cellular_uploads"
         static let suppressCellularWarnings = "config_suppress_cellular_warnings"
+        static let fullImagePreviews = "config_full_image_previews"
+        static let tapForCellularPreviews = "config_tap_for_cellular_previews"
         static let iCloudSync = "config_icloud_sync_enabled"
     }
 
@@ -253,6 +255,19 @@ final class ConfigStore {
         didSet { defaults.set(suppressCellularWarnings, forKey: Keys.suppressCellularWarnings) }
     }
 
+    /// When false, image previews decode to a bounded thumbnail for the UI.
+    /// When true, preview UI decodes the full image data. Network usage is
+    /// unchanged unless a server-side thumbnail object exists.
+    var rendersFullImagePreviews: Bool = false {
+        didSet { defaults.set(rendersFullImagePreviews, forKey: Keys.fullImagePreviews) }
+    }
+
+    /// iOS browsing safeguard: on cellular, show a deliberate Preview button
+    /// instead of auto-fetching the remote image. Default on.
+    var requiresTapForCellularPreviews: Bool = true {
+        didSet { defaults.set(requiresTapForCellularPreviews, forKey: Keys.tapForCellularPreviews) }
+    }
+
     /// Whether this device participates in config sync over iCloud Keychain.
     /// Off = stop pushing and adopting the shared payload (existing cloud
     /// data is left in place for other devices). Re-enabling adopts a newer
@@ -290,6 +305,12 @@ final class ConfigStore {
         }
         if defaults.object(forKey: Keys.iCloudSync) != nil {
             iCloudSyncEnabled = defaults.bool(forKey: Keys.iCloudSync)
+        }
+        if defaults.object(forKey: Keys.fullImagePreviews) != nil {
+            rendersFullImagePreviews = defaults.bool(forKey: Keys.fullImagePreviews)
+        }
+        if defaults.object(forKey: Keys.tapForCellularPreviews) != nil {
+            requiresTapForCellularPreviews = defaults.bool(forKey: Keys.tapForCellularPreviews)
         }
         suppressCellularWarnings = defaults.bool(forKey: Keys.suppressCellularWarnings)
         migrateLegacyConfigIfNeeded()
