@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import ImageIO
 
 struct BucketBrowserView: View {
     let destination: Destination
@@ -342,7 +343,7 @@ private struct RemoteImagePreview: View {
                 return
             }
 
-            guard let uiImage = UIImage(data: data) else {
+            guard let uiImage = Self.downsampledImage(from: data, maxPixel: 1200) else {
                 errorMessage = "The link did not return a supported image."
                 return
             }
@@ -351,6 +352,24 @@ private struct RemoteImagePreview: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    nonisolated private static func downsampledImage(from data: Data, maxPixel: CGFloat) -> UIImage? {
+        let sourceOptions: [CFString: Any] = [kCGImageSourceShouldCache: false]
+        guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions as CFDictionary) else {
+            return UIImage(data: data)
+        }
+
+        let thumbOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbOptions as CFDictionary) else {
+            return UIImage(data: data)
+        }
+        return UIImage(cgImage: cgImage)
     }
 }
 
