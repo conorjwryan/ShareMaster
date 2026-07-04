@@ -466,6 +466,7 @@ actor S3Service {
         // makes CFNetwork warn and would race two body sources.
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
+        request.allowsCellularAccess = config.allowsCellular
 
         var signedHeaders: [String: String] = [
             "host": host,
@@ -638,6 +639,7 @@ actor S3Service {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.allowsCellularAccess = config.allowsCellular
         for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -682,6 +684,7 @@ actor S3Service {
 
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
+        request.allowsCellularAccess = config.allowsCellular
         for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
 
         let progressDelegate = UploadProgressDelegate { sent, _ in
@@ -733,6 +736,7 @@ actor S3Service {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.allowsCellularAccess = config.allowsCellular
         request.httpBody = payload
         for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
 
@@ -763,6 +767,7 @@ actor S3Service {
 
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
+        request.allowsCellularAccess = config.allowsCellular
         for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
         _ = try? await URLSession.shared.data(for: request)
     }

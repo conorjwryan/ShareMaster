@@ -20,8 +20,18 @@ struct IOSSettingsView: View {
     @State private var addingDestination = false
 
     var body: some View {
+        @Bindable var config = config
         NavigationStack {
             List {
+                Section {
+                    Toggle("Upload over Mobile Data", isOn: $config.allowsCellularUploads)
+                    Toggle("iCloud Sync", isOn: $config.iCloudSyncEnabled)
+                } header: {
+                    Text("Sync")
+                } footer: {
+                    Text("With Mobile Data off, uploads only run on Wi-Fi. iCloud Sync shares your accounts and destinations between devices through iCloud Keychain.")
+                }
+
                 Section("Accounts") {
                     ForEach(config.accounts) { account in
                         Button {

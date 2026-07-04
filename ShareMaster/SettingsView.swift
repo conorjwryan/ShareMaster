@@ -17,6 +17,8 @@ struct SettingsView: View {
                 .tabItem { Label("Accounts", systemImage: "key") }
             DestinationsSettingsView()
                 .tabItem { Label("Destinations", systemImage: "tray.full") }
+            SyncSettingsView()
+                .tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath.icloud") }
             AboutSettingsView()
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
@@ -543,6 +545,26 @@ struct GeneralSettingsView: View {
                 }
             } footer: {
                 Text("Per destination shows only the selected destination's files. Combined merges files from every destination with a badge showing where each one lives. The list only loads while expanded, and shows at most the number of files chosen here — keeping list requests down on providers that charge per operation.")
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+// MARK: - Sync
+
+struct SyncSettingsView: View {
+    var config = ConfigStore.shared
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Sync via iCloud", isOn: Binding(
+                    get: { config.iCloudSyncEnabled },
+                    set: { config.iCloudSyncEnabled = $0 }
+                ))
+            } footer: {
+                Text("Shares your accounts and destinations with your other devices through iCloud Keychain. Requires the same iCloud account with iCloud Keychain enabled on each device. When off, this Mac keeps its local configuration and neither publishes nor adopts changes; turning it back on picks up the newest configuration and publishes this Mac's.")
             }
         }
         .formStyle(.grouped)

@@ -101,6 +101,8 @@ struct S3Config {
     let uploadCapMBps: Double      // 0 = unlimited
     let downloadCapMBps: Double    // 0 = unlimited
     let maxConcurrentParts: Int
+    /// Whether requests may go over mobile data (no-op on macOS).
+    let allowsCellular: Bool
 }
 
 extension S3Config {
@@ -143,6 +145,8 @@ final class ConfigStore {
         static let recentsExpanded = "config_recents_expanded"
         static let lastSelectedDestination = "config_last_selected_destination"
         static let cloudUpdatedAt = "config_cloud_updated_at"
+        static let cellularUploads = "config_cellular_uploads"
+        static let iCloudSync = "config_icloud_sync_enabled"
     }
 
     private(set) var accounts: [Account] = [] {
@@ -185,6 +189,26 @@ final class ConfigStore {
         didSet { defaults.set(lastSelectedDestinationID?.uuidString, forKey: Keys.lastSelectedDestination) }
     }
 
+    /// Whether transfers may use mobile data. Consulted per-request via
+    /// S3Config.allowsCellular; a no-op on macOS/Wi-Fi. Default on.
+    var allowsCellularUploads: Bool = true {
+        didSet { defaults.set(allowsCellularUploads, forKey: Keys.cellularUploads) }
+    }
+
+    /// Whether this device participates in config sync over iCloud Keychain.
+    /// Off = stop pushing and adopting the shared payload (existing cloud
+    /// data is left in place for other devices). Re-enabling adopts a newer
+    /// remote config if one exists, then publishes this device's.
+    var iCloudSyncEnabled: Bool = true {
+        didSet {
+            defaults.set(iCloudSyncEnabled, forKey: Keys.iCloudSync)
+            if iCloudSyncEnabled && !oldValue {
+                adoptCloudIfNewer()
+                pushToCloud()
+            }
+        }
+    }
+
     var isConfigured: Bool { !destinations.isEmpty }
 
     private init() {
@@ -200,6 +224,14 @@ final class ConfigStore {
         recentsExpanded = defaults.bool(forKey: Keys.recentsExpanded)
         if let raw = defaults.string(forKey: Keys.lastSelectedDestination) {
             lastSelectedDestinationID = UUID(uuidString: raw)
+        }
+        // Default-on toggles: only override when a value was explicitly saved
+        // (defaults.bool would read "unset" as false).
+        if defaults.object(forKey: Keys.cellularUploads) != nil {
+            allowsCellularUploads = defaults.bool(forKey: Keys.cellularUploads)
+        }
+        if defaults.object(forKey: Keys.iCloudSync) != nil {
+            iCloudSyncEnabled = defaults.bool(forKey: Keys.iCloudSync)
         }
         migrateLegacyConfigIfNeeded()
         startCloudSync()
@@ -229,6 +261,7 @@ final class ConfigStore {
     }
 
     private func startCloudSync() {
+        guard iCloudSyncEnabled else { return }
         // Force-read every account's secrets: keychainGet upgrades legacy
         // (device-local) items into the synchronizable group as a side
         // effect, so a device configured before sync existed publishes its
@@ -267,6 +300,7 @@ final class ConfigStore {
     }
 
     private func pushToCloud() {
+        guard iCloudSyncEnabled else { return }
         let payload = CloudPayload(
             accounts: accounts,
             destinations: destinations,
@@ -279,7 +313,8 @@ final class ConfigStore {
     }
 
     private func adoptCloudIfNewer() {
-        guard let json = keychainGet(key: Self.cloudPayloadKey),
+        guard iCloudSyncEnabled,
+              let json = keychainGet(key: Self.cloudPayloadKey),
               let payload = try? JSONDecoder().decode(CloudPayload.self, from: Data(json.utf8)),
               payload.updatedAt > localUpdatedAt
         else { return }
@@ -325,7 +360,8 @@ final class ConfigStore {
             copyOnUpload: destination.copyOnUpload,
             uploadCapMBps: destination.uploadCapMBps ?? account.uploadCapMBps ?? 0,
             downloadCapMBps: destination.downloadCapMBps ?? account.downloadCapMBps ?? 0,
-            maxConcurrentParts: S3Config.resolveConcurrency(destination.maxConcurrentParts ?? account.maxConcurrentParts)
+            maxConcurrentParts: S3Config.resolveConcurrency(destination.maxConcurrentParts ?? account.maxConcurrentParts),
+            allowsCellular: allowsCellularUploads
         )
     }
 
@@ -347,7 +383,8 @@ final class ConfigStore {
             copyOnUpload: false,
             uploadCapMBps: 0,
             downloadCapMBps: 0,
-            maxConcurrentParts: S3Config.defaultConcurrentParts
+            maxConcurrentParts: S3Config.defaultConcurrentParts,
+            allowsCellular: allowsCellularUploads
         )
     }
 
