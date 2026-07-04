@@ -11,6 +11,29 @@
 
 import SwiftUI
 import UIKit
+import Network
+
+/// Tracks whether the active network path runs over cellular, for the
+/// mobile-data gate below. NWPathMonitor delivers updates asynchronously,
+/// so the very first transfer after launch could race the initial reading —
+/// acceptable for a warning heuristic.
+@MainActor @Observable
+final class NetworkMonitor {
+    static let shared = NetworkMonitor()
+    private(set) var isOnCellular = false
+
+    private let monitor = NWPathMonitor()
+
+    private init() {
+        monitor.pathUpdateHandler = { path in
+            let cellular = path.status == .satisfied && path.usesInterfaceType(.cellular)
+            Task { @MainActor in
+                NetworkMonitor.shared.isOnCellular = cellular
+            }
+        }
+        monitor.start(queue: DispatchQueue(label: "com.cjwr.ShareMaster.NetworkMonitor"))
+    }
+}
 
 @MainActor @Observable
 final class UploadManager {
@@ -39,9 +62,72 @@ final class UploadManager {
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
     private var clearTask: Task<Void, Never>?
 
-    private init() {}
+    // MARK: Mobile-data gate
+
+    /// A batch held back pending the "you're on mobile data" confirmation.
+    struct CellularPrompt: Identifiable {
+        let id = UUID()
+        let files: [URL]
+        let destination: Destination
+        let onUploaded: () -> Void
+        let totalBytes: Int64
+
+        var message: String {
+            let size = ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
+            return files.count == 1
+                ? "You're on mobile data. Uploading this file will use about \(size) of your mobile data plan."
+                : "You're on mobile data. Uploading these \(files.count) files will use about \(size) of your mobile data plan."
+        }
+    }
+
+    /// Non-nil while waiting for the user to confirm a cellular upload.
+    private(set) var cellularPrompt: CellularPrompt?
+    /// Set when an upload was refused because mobile data is disabled.
+    var showCellularDisabledAlert = false
+
+    private init() {
+        // Warm the path monitor now (UploadManager.shared is touched at app
+        // launch by DestinationListView). NWPathMonitor's first reading is
+        // asynchronous — starting it lazily at gate-check time would always
+        // read "not cellular" and wave the first upload through.
+        _ = NetworkMonitor.shared
+    }
 
     func start(files: [URL], destination: Destination, onUploaded: @escaping () -> Void = {}) {
+        if NetworkMonitor.shared.isOnCellular {
+            let config = ConfigStore.shared
+            if !config.allowsCellularUploads {
+                showCellularDisabledAlert = true
+                return
+            }
+            if !config.suppressCellularWarnings {
+                cellularPrompt = CellularPrompt(
+                    files: files,
+                    destination: destination,
+                    onUploaded: onUploaded,
+                    totalBytes: files.reduce(0) { $0 + Self.fileSize($1) }
+                )
+                return
+            }
+        }
+        enqueue(files: files, destination: destination, onUploaded: onUploaded)
+    }
+
+    func confirmCellularUpload() {
+        guard let prompt = cellularPrompt else { return }
+        cellularPrompt = nil
+        enqueue(files: prompt.files, destination: prompt.destination, onUploaded: prompt.onUploaded)
+    }
+
+    func cancelCellularUpload() {
+        cellularPrompt = nil
+    }
+
+    private nonisolated static func fileSize(_ url: URL) -> Int64 {
+        (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
+    }
+
+    private func enqueue(files: [URL], destination: Destination, onUploaded: @escaping () -> Void) {
         guard let s3Config = ConfigStore.shared.s3Config(for: destination) else {
             phase = .failed("This destination's account is missing its credentials.")
             return
@@ -97,7 +183,18 @@ final class UploadManager {
             batch.onUploaded()
             scheduleClear()
         } catch {
-            phase = .failed(error.localizedDescription)
+            // Backstop for the pre-flight gate: if the OS refused the
+            // transfer because cellular is disallowed, show the same
+            // "disabled" alert instead of a raw network error.
+            if !ConfigStore.shared.allowsCellularUploads,
+               NetworkMonitor.shared.isOnCellular,
+               let urlError = error as? URLError,
+               [.dataNotAllowed, .notConnectedToInternet, .internationalRoamingOff].contains(urlError.code) {
+                phase = nil
+                showCellularDisabledAlert = true
+            } else {
+                phase = .failed(error.localizedDescription)
+            }
         }
     }
 

@@ -146,6 +146,7 @@ final class ConfigStore {
         static let lastSelectedDestination = "config_last_selected_destination"
         static let cloudUpdatedAt = "config_cloud_updated_at"
         static let cellularUploads = "config_cellular_uploads"
+        static let suppressCellularWarnings = "config_suppress_cellular_warnings"
         static let iCloudSync = "config_icloud_sync_enabled"
     }
 
@@ -189,10 +190,19 @@ final class ConfigStore {
         didSet { defaults.set(lastSelectedDestinationID?.uuidString, forKey: Keys.lastSelectedDestination) }
     }
 
-    /// Whether transfers may use mobile data. Consulted per-request via
-    /// S3Config.allowsCellular; a no-op on macOS/Wi-Fi. Default on.
+    /// Whether file transfers may use mobile data. Gated pre-flight in the
+    /// iOS UploadManager (alert when off, data-use confirmation when on) and
+    /// enforced per-request via S3Config.allowsCellular. Browsing and link
+    /// copying are never gated. No-op on macOS/Wi-Fi. Default on.
     var allowsCellularUploads: Bool = true {
         didSet { defaults.set(allowsCellularUploads, forKey: Keys.cellularUploads) }
+    }
+
+    /// Skips the "this will use ~X MB of mobile data" confirmation before
+    /// transfers on cellular. Only meaningful while allowsCellularUploads
+    /// is on. Default off (warn every time).
+    var suppressCellularWarnings: Bool = false {
+        didSet { defaults.set(suppressCellularWarnings, forKey: Keys.suppressCellularWarnings) }
     }
 
     /// Whether this device participates in config sync over iCloud Keychain.
@@ -233,6 +243,7 @@ final class ConfigStore {
         if defaults.object(forKey: Keys.iCloudSync) != nil {
             iCloudSyncEnabled = defaults.bool(forKey: Keys.iCloudSync)
         }
+        suppressCellularWarnings = defaults.bool(forKey: Keys.suppressCellularWarnings)
         migrateLegacyConfigIfNeeded()
         startCloudSync()
     }

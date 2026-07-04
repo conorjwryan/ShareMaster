@@ -24,12 +24,14 @@ struct IOSSettingsView: View {
         NavigationStack {
             List {
                 Section {
-                    Toggle("Upload over Mobile Data", isOn: $config.allowsCellularUploads)
+                    Toggle("Upload on Mobile Data", isOn: $config.allowsCellularUploads)
+                    Toggle("Skip Mobile Data Warnings", isOn: $config.suppressCellularWarnings)
+                        .disabled(!config.allowsCellularUploads)
                     Toggle("iCloud Sync", isOn: $config.iCloudSyncEnabled)
                 } header: {
                     Text("Sync")
                 } footer: {
-                    Text("With Mobile Data off, uploads only run on Wi-Fi. iCloud Sync shares your accounts and destinations between devices through iCloud Keychain.")
+                    Text("With Mobile Data off, files upload only over Wi-Fi — browsing and copying links work anywhere. With it on, you'll see how much data an upload will use before it starts, unless warnings are skipped. iCloud Sync shares your accounts and destinations between devices through iCloud Keychain.")
                 }
 
                 Section("Accounts") {
