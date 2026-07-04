@@ -59,7 +59,13 @@ struct ContentView: View {
     @State private var downloadingObjectKey: String?
     @State private var downloadProgress: Double = 0
 
-    private var destinations: [Destination] { config.sortedDestinations }
+    /// Hidden destinations stay out of the popover until the word mark in the
+    /// header is clicked; resets each time the popover (re)opens.
+    @State private var showHidden = false
+
+    private var destinations: [Destination] {
+        config.sortedDestinations.filter { showHidden || !$0.isHidden }
+    }
 
     private var selectedDestination: Destination? {
         destinations.first { $0.id == selectedDestinationID } ?? destinations.first
@@ -85,6 +91,7 @@ struct ContentView: View {
         .task {
             // Popover content is rebuilt on each open, so this also picks up
             // config changes synced from other devices via iCloud Keychain.
+            showHidden = false
             config.refreshFromCloud()
             if selectedDestinationID == nil {
                 let remembered = config.lastSelectedDestinationID
@@ -124,8 +131,13 @@ struct ContentView: View {
 
     private var header: some View {
         HStack {
+            // The word mark doubles as the reveal switch for hidden
+            // destinations; deliberately gives no visual hint.
             Text("ShareMaster")
                 .font(.headline)
+                .onTapGesture {
+                    withAnimation { showHidden.toggle() }
+                }
             Spacer()
             HStack(spacing: 12) {
                 Button {

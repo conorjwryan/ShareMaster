@@ -12,6 +12,11 @@ struct DestinationListView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var config = ConfigStore.shared
     @State private var showSettings = false
+    @State private var showHidden = false
+
+    private var visibleDestinations: [Destination] {
+        config.sortedDestinations.filter { showHidden || !$0.isHidden }
+    }
 
     var body: some View {
         NavigationStack {
@@ -19,7 +24,7 @@ struct DestinationListView: View {
                 if config.destinations.isEmpty {
                     emptyState
                 } else {
-                    List(config.sortedDestinations) { destination in
+                    List(visibleDestinations) { destination in
                         NavigationLink(value: destination) {
                             DestinationRow(destination: destination, config: config)
                         }
@@ -27,12 +32,22 @@ struct DestinationListView: View {
                 }
             }
             .navigationTitle("ShareMaster")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: Destination.self) { destination in
                 BucketBrowserView(destination: destination)
             }
             .toolbar {
+                // The word mark doubles as the reveal switch for hidden
+                // destinations; deliberately gives no visual hint.
+                ToolbarItem(placement: .principal) {
+                    Text("ShareMaster")
+                        .font(.headline)
+                        .onTapGesture {
+                            withAnimation { showHidden.toggle() }
+                        }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
-                    UploadMenu()
+                    UploadMenu(includeHidden: showHidden)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -47,7 +62,13 @@ struct DestinationListView: View {
             }
             .onChange(of: scenePhase) { _, phase in
                 // Pick up config synced from the Mac via iCloud Keychain.
-                if phase == .active { config.refreshFromCloud() }
+                if phase == .active {
+                    config.refreshFromCloud()
+                } else {
+                    // Re-conceal hidden destinations whenever the app leaves
+                    // the foreground (also keeps them out of the app switcher).
+                    showHidden = false
+                }
             }
         }
     }
@@ -70,9 +91,9 @@ struct DestinationRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "externaldrive.badge.icloud")
+            Image(systemName: destination.isHidden ? "eye.slash" : "externaldrive.badge.icloud")
                 .font(.title3)
-                .foregroundStyle(.tint)
+                .foregroundStyle(destination.isHidden ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
                 .frame(width: 28)
             VStack(alignment: .leading, spacing: 2) {
                 Text(destination.name.isEmpty ? destination.bucket : destination.name)

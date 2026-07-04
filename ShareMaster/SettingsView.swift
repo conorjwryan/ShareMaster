@@ -257,6 +257,11 @@ struct DestinationsSettingsView: View {
                                     .lineLimit(1).truncationMode(.middle)
                             }
                             Spacer()
+                            if destination.isHidden {
+                                Image(systemName: "eye.slash")
+                                    .foregroundStyle(.tertiary)
+                                    .help("Hidden — revealed by clicking the ShareMaster word mark")
+                            }
                             Image(systemName: destination.linkMode == .presigned ? "lock" : "globe")
                                 .foregroundStyle(.tertiary)
                                 .help(destination.linkMode == .presigned ? "Presigned links" : "Public links")
@@ -378,6 +383,14 @@ struct DestinationEditor: View {
                     }
                 }
                 Toggle("Copy link to clipboard after upload", isOn: $destination.copyOnUpload)
+            }
+
+            Section {
+                Toggle("Hide from destination lists", isOn: $destination.isHidden)
+            } header: {
+                Text("Privacy")
+            } footer: {
+                Text("Hidden destinations don't appear in the popover, the iOS app or the share sheet until revealed by tapping the ShareMaster word mark (in the popover or the iOS app).")
             }
 
             Section {

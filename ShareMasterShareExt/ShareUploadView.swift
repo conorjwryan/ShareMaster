@@ -27,6 +27,12 @@ struct ShareUploadView: View {
     @State private var loadedFiles: [URL]?   // nil while attachments still load
     private let config = ConfigStore.shared
 
+    /// Hidden destinations never appear in the share sheet — they're only
+    /// reachable from inside the app.
+    private var visibleDestinations: [Destination] {
+        config.sortedDestinations.filter { !$0.isHidden }
+    }
+
     var body: some View {
         NavigationStack {
             content
@@ -80,7 +86,7 @@ struct ShareUploadView: View {
 
     private var destinationPicker: some View {
         Group {
-            if config.destinations.isEmpty {
+            if visibleDestinations.isEmpty {
                 ContentUnavailableView(
                     "No Destinations",
                     systemImage: "tray.and.arrow.up",
@@ -89,7 +95,7 @@ struct ShareUploadView: View {
             } else {
                 List {
                     Section(loadedFiles == nil ? "Preparing files…" : sectionTitle) {
-                        ForEach(config.sortedDestinations) { destination in
+                        ForEach(visibleDestinations) { destination in
                             Button {
                                 upload(to: destination)
                             } label: {

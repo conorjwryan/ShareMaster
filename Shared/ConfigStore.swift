@@ -57,6 +57,14 @@ struct Destination: Codable, Identifiable, Hashable {
     /// Security-scoped bookmark of the custom download folder. Stored as a
     /// bookmark because the app is sandboxed.
     var downloadDirBookmark: Data? = nil
+    /// Hidden destinations don't appear in the iOS main list until revealed
+    /// by tapping the word mark. Optional so existing stored JSON decodes.
+    var hidden: Bool? = nil
+
+    var isHidden: Bool {
+        get { hidden ?? false }
+        set { hidden = newValue }
+    }
 
     nonisolated var effectiveDownloadLocation: DownloadLocation {
         downloadLocation ?? (downloadDirBookmark != nil ? .custom : .downloads)

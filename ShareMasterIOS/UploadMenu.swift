@@ -16,6 +16,9 @@ import UniformTypeIdentifiers
 struct UploadMenu: View {
     /// Upload straight to this destination when set; otherwise ask.
     var destination: Destination? = nil
+    /// Whether the destination picker includes hidden destinations —
+    /// mirrors the main list's reveal state.
+    var includeHidden = false
     /// Called after a successful upload (e.g. to refresh the object list).
     var onUploaded: () -> Void = {}
 
@@ -66,13 +69,14 @@ struct UploadMenu: View {
             AppUploadView(
                 files: request.files,
                 fixedDestination: destination,
+                includeHidden: includeHidden,
                 onUploaded: onUploaded
             )
         }
     }
 
     /// fileImporter URLs are security-scoped and short-lived — copy them out.
-    private static func copyToTemp(_ url: URL) -> URL? {
+    private nonisolated static func copyToTemp(_ url: URL) -> URL? {
         let accessing = url.startAccessingSecurityScopedResource()
         defer { if accessing { url.stopAccessingSecurityScopedResource() } }
         do {
@@ -100,7 +104,7 @@ private struct PickedFile: Transferable {
 
     /// Copies into a unique per-pick temp directory so identically-named
     /// files don't clash (mirrors the share extension's AttachmentLoader).
-    static func tempCopy(of url: URL) throws -> URL {
+    nonisolated static func tempCopy(of url: URL) throws -> URL {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -115,6 +119,7 @@ private struct PickedFile: Transferable {
 struct AppUploadView: View {
     let files: [URL]
     let fixedDestination: Destination?
+    var includeHidden = false
     var onUploaded: () -> Void = {}
 
     private enum Phase {
@@ -191,7 +196,7 @@ struct AppUploadView: View {
     private var destinationPicker: some View {
         List {
             Section(files.count == 1 ? "Upload 1 file to" : "Upload \(files.count) files to") {
-                ForEach(config.sortedDestinations) { destination in
+                ForEach(config.sortedDestinations.filter { includeHidden || !$0.isHidden }) { destination in
                     Button {
                         upload(to: destination)
                     } label: {

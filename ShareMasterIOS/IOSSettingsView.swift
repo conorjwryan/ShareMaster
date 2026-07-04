@@ -57,13 +57,21 @@ struct IOSSettingsView: View {
                         Button {
                             editingDestination = destination
                         } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(destination.name.isEmpty ? "Untitled" : destination.name)
-                                    .foregroundStyle(.primary)
-                                Text(destination.bucket + (destination.pathPrefix.isEmpty ? "" : "/\(destination.pathPrefix)"))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(destination.name.isEmpty ? "Untitled" : destination.name)
+                                        .foregroundStyle(.primary)
+                                    Text(destination.bucket + (destination.pathPrefix.isEmpty ? "" : "/\(destination.pathPrefix)"))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                                if destination.isHidden {
+                                    Spacer()
+                                    Image(systemName: "eye.slash")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
                         .swipeActions {
@@ -218,6 +226,14 @@ struct DestinationEditorView: View {
                     Text("Naming")
                 } footer: {
                     Text("Preview: \(NamingTemplate.preview(draft.namingTemplate))\nTokens: \(NamingTemplate.allTokens.joined(separator: " "))")
+                }
+
+                Section {
+                    Toggle("Hide from main list", isOn: $draft.isHidden)
+                } header: {
+                    Text("Privacy")
+                } footer: {
+                    Text("Hidden destinations stay out of the main list. Tap the ShareMaster word mark there to reveal them.")
                 }
 
                 Section("Link") {
