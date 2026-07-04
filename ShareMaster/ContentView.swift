@@ -213,6 +213,16 @@ struct ContentView: View {
                     isDropTarget: dropTargetID == destination.id
                 )
                 .tag(destination.id)
+                .contextMenu {
+                    // The editor doesn't fit inside the popover, so the draft
+                    // is handed to the Settings window, which opens its
+                    // Destinations editor pre-filled with it.
+                    Button("Duplicate…") {
+                        config.pendingDuplicate = config.duplicateDraft(of: destination)
+                        openSettings()
+                        openNativeSettings()
+                    }
+                }
                 .onDrop(of: [.fileURL], isTargeted: Binding(
                     get: { dropTargetID == destination.id },
                     set: { targeted in

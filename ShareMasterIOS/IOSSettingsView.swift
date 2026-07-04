@@ -16,8 +16,10 @@ struct IOSSettingsView: View {
 
     @State private var editingAccount: Account?
     @State private var addingAccount = false
+    @State private var duplicatingAccount: Account?
     @State private var editingDestination: Destination?
     @State private var addingDestination = false
+    @State private var duplicatingDestination: Destination?
 
     var body: some View {
         @Bindable var config = config
@@ -59,6 +61,13 @@ struct IOSSettingsView: View {
                             }
                             .disabled(!config.destinationsUsing(accountId: account.id).isEmpty)
                         }
+                        .contextMenu {
+                            Button {
+                                duplicatingAccount = account
+                            } label: {
+                                Label("Duplicate", systemImage: "plus.square.on.square")
+                            }
+                        }
                     }
                     Button {
                         addingAccount = true
@@ -96,6 +105,13 @@ struct IOSSettingsView: View {
                                 Label("Delete", systemImage: "trash")
                             }
                         }
+                        .contextMenu {
+                            Button {
+                                duplicatingDestination = destination
+                            } label: {
+                                Label("Duplicate", systemImage: "plus.square.on.square")
+                            }
+                        }
                     }
                     Button {
                         addingDestination = true
@@ -118,11 +134,17 @@ struct IOSSettingsView: View {
             .sheet(item: $editingAccount) { account in
                 AccountEditorView(account: account)
             }
+            .sheet(item: $duplicatingAccount) { account in
+                AccountEditorView(duplicating: account)
+            }
             .sheet(isPresented: $addingDestination) {
                 DestinationEditorView(destination: nil)
             }
             .sheet(item: $editingDestination) { destination in
                 DestinationEditorView(destination: destination)
+            }
+            .sheet(item: $duplicatingDestination) { destination in
+                DestinationEditorView(duplicating: destination)
             }
         }
     }
@@ -151,6 +173,16 @@ struct AccountEditorView: View {
             _accessKeyId = State(initialValue: "")
             _secret = State(initialValue: "")
         }
+    }
+
+    /// Duplicate flow: a fresh draft copied from `source` with the
+    /// credentials pre-filled; nothing is stored until Save.
+    init(duplicating source: Account) {
+        account = nil
+        isNew = true
+        _draft = State(initialValue: ConfigStore.shared.duplicateDraft(of: source))
+        _accessKeyId = State(initialValue: ConfigStore.shared.accessKeyId(for: source.id))
+        _secret = State(initialValue: ConfigStore.shared.secret(for: source.id))
     }
 
     var body: some View {
@@ -213,6 +245,14 @@ struct DestinationEditorView: View {
         isNew = destination == nil
         let fallbackAccount = ConfigStore.shared.visibleAccounts.first?.id ?? UUID()
         _draft = State(initialValue: destination ?? Destination(accountId: fallbackAccount))
+    }
+
+    /// Duplicate flow: a fresh draft copied from `source`; nothing is stored
+    /// until Save.
+    init(duplicating source: Destination) {
+        destination = nil
+        isNew = true
+        _draft = State(initialValue: ConfigStore.shared.duplicateDraft(of: source))
     }
 
     var body: some View {

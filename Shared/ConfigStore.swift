@@ -380,6 +380,45 @@ final class ConfigStore {
         destinationsUsing(accountId: accountId).filter { revealHidden || !$0.isHidden }
     }
 
+    // MARK: - Duplication
+
+    /// Set by the Mac popover's Duplicate action; the Settings window switches
+    /// to the Destinations tab and opens the editor pre-filled with it.
+    /// Transient — never persisted.
+    var pendingDuplicate: Destination?
+
+    /// "Backups" → "Backups (1)"; "Backups (1)" → "Backups (2)". Strips an
+    /// existing "(n)" suffix first, then takes the first free number.
+    nonisolated static func copyName(_ name: String, existing: [String]) -> String {
+        var base = name
+        if let range = base.range(of: #" \(\d+\)$"#, options: .regularExpression) {
+            base.removeSubrange(range)
+        }
+        var n = 1
+        while existing.contains("\(base) (\(n))") { n += 1 }
+        return "\(base) (\(n))"
+    }
+
+    /// Draft copy of an account with a fresh ID and suffixed name. Nothing is
+    /// stored until an editor saves it; the editor pre-fills the credentials
+    /// from the source account and writes them under the copy's own ID.
+    func duplicateDraft(of account: Account) -> Account {
+        var copy = account
+        copy.id = UUID()
+        copy.name = Self.copyName(account.name, existing: accounts.map(\.name))
+        return copy
+    }
+
+    /// Draft copy of a destination with a fresh ID and suffixed name, slotted
+    /// right after the original (upsertDestination makes room on save).
+    func duplicateDraft(of destination: Destination) -> Destination {
+        var copy = destination
+        copy.id = UUID()
+        copy.name = Self.copyName(destination.name, existing: destinations.map(\.name))
+        copy.sortOrder = destination.sortOrder + 1
+        return copy
+    }
+
     /// Builds a fully-resolved config for a destination, pulling the account's
     /// secrets from the Keychain. Returns nil if the account is missing.
     func s3Config(for destination: Destination) -> S3Config? {
@@ -491,10 +530,18 @@ final class ConfigStore {
         if let idx = destinations.firstIndex(where: { $0.id == dest.id }) {
             destinations[idx] = dest
         } else {
+            var list = destinations
             if dest.sortOrder == 0 {
-                dest.sortOrder = (destinations.map(\.sortOrder).max() ?? 0) + 1
+                dest.sortOrder = (list.map(\.sortOrder).max() ?? 0) + 1
+            } else {
+                // Inserting at a specific slot (duplicates land right after
+                // their original): shift everything at or beyond it down one.
+                for i in list.indices where list[i].sortOrder >= dest.sortOrder {
+                    list[i].sortOrder += 1
+                }
             }
-            destinations.append(dest)
+            list.append(dest)
+            destinations = list
         }
     }
 

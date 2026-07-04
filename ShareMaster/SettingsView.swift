@@ -9,20 +9,40 @@ import SwiftUI
 import AppKit
 
 struct SettingsView: View {
+    private enum Tab: Hashable {
+        case general, accounts, destinations, sync, about
+    }
+
+    var config = ConfigStore.shared
+    @State private var selection: Tab = .general
+
     var body: some View {
-        TabView {
+        TabView(selection: $selection) {
             GeneralSettingsView()
                 .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(Tab.general)
             AccountsSettingsView()
                 .tabItem { Label("Accounts", systemImage: "key") }
+                .tag(Tab.accounts)
             DestinationsSettingsView()
                 .tabItem { Label("Destinations", systemImage: "tray.full") }
+                .tag(Tab.destinations)
             SyncSettingsView()
                 .tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath.icloud") }
+                .tag(Tab.sync)
             AboutSettingsView()
                 .tabItem { Label("About", systemImage: "info.circle") }
+                .tag(Tab.about)
         }
         .frame(width: 520, height: 540)
+        // A duplicate started from the popover lands on the Destinations tab,
+        // where DestinationsSettingsView opens the editor with it.
+        .onAppear {
+            if config.pendingDuplicate != nil { selection = .destinations }
+        }
+        .onChange(of: config.pendingDuplicate) { _, pending in
+            if pending != nil { selection = .destinations }
+        }
     }
 }
 
@@ -33,6 +53,9 @@ struct AccountsSettingsView: View {
 
     @State private var editingAccount: Account?
     @State private var isNewAccount = false
+    /// When duplicating, the account whose stored credentials pre-fill the
+    /// editor (the draft's own ID has none in the Keychain yet).
+    @State private var duplicateSourceID: UUID?
     @State private var deleteError: String?
 
     var body: some View {
@@ -70,6 +93,10 @@ struct AccountsSettingsView: View {
                                 .buttonStyle(.borderless)
                         }
                         .padding(.vertical, 2)
+                        .contentShape(Rectangle())
+                        .contextMenu {
+                            Button("Duplicate") { duplicate(account) }
+                        }
                     }
                 }
             }
@@ -78,6 +105,7 @@ struct AccountsSettingsView: View {
             HStack {
                 Button {
                     isNewAccount = true
+                    duplicateSourceID = nil
                     editingAccount = Account()
                 } label: { Label("Add Account", systemImage: "plus") }
                 Spacer()
@@ -85,7 +113,7 @@ struct AccountsSettingsView: View {
             .padding(10)
         }
         .sheet(item: $editingAccount) { account in
-            AccountEditor(account: account, isNew: isNewAccount)
+            AccountEditor(account: account, isNew: isNewAccount, secretsSourceID: duplicateSourceID)
         }
         .alert("Can't delete account", isPresented: .constant(deleteError != nil)) {
             Button("OK") { deleteError = nil }
@@ -108,6 +136,12 @@ struct AccountsSettingsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private func duplicate(_ account: Account) {
+        isNewAccount = true
+        duplicateSourceID = account.id
+        editingAccount = config.duplicateDraft(of: account)
+    }
+
     private func delete(_ account: Account) {
         if !config.deleteAccount(id: account.id) {
             // Only name visible destinations — the delete still fails if a
@@ -124,6 +158,9 @@ struct AccountEditor: View {
 
     @State var account: Account
     let isNew: Bool
+    /// Duplicating: the source account whose Keychain credentials pre-fill
+    /// the fields. Save writes them under the draft's own ID.
+    var secretsSourceID: UUID? = nil
 
     @State private var accessKeyId = ""
     @State private var secret = ""
@@ -200,10 +237,10 @@ struct AccountEditor: View {
     }
 
     private func load() {
-        guard !isNew else { return }
-        accessKeyId = config.accessKeyId(for: account.id)
-        secret = config.secret(for: account.id)
-        testBucket = config.destinationsUsing(accountId: account.id).first?.bucket ?? ""
+        guard let sourceID = isNew ? secretsSourceID : account.id else { return }
+        accessKeyId = config.accessKeyId(for: sourceID)
+        secret = config.secret(for: sourceID)
+        testBucket = config.destinationsUsing(accountId: sourceID).first?.bucket ?? ""
     }
 
     private func save() {
@@ -286,6 +323,10 @@ struct DestinationsSettingsView: View {
                                 .buttonStyle(.borderless)
                         }
                         .padding(.vertical, 2)
+                        .contentShape(Rectangle())
+                        .contextMenu {
+                            Button("Duplicate") { duplicate(destination) }
+                        }
                     }
                 }
             }
@@ -304,6 +345,22 @@ struct DestinationsSettingsView: View {
         .sheet(item: $editingDestination) { destination in
             DestinationEditor(destination: destination, isNew: isNewDestination)
         }
+        // A duplicate started from the popover's context menu: open the
+        // editor with the ready-made draft.
+        .onAppear(perform: consumePendingDuplicate)
+        .onChange(of: config.pendingDuplicate) { _, _ in consumePendingDuplicate() }
+    }
+
+    private func duplicate(_ destination: Destination) {
+        isNewDestination = true
+        editingDestination = config.duplicateDraft(of: destination)
+    }
+
+    private func consumePendingDuplicate() {
+        guard let draft = config.pendingDuplicate else { return }
+        config.pendingDuplicate = nil
+        isNewDestination = true
+        editingDestination = draft
     }
 
     private func subtitle(_ d: Destination) -> String {
