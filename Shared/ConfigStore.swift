@@ -350,6 +350,36 @@ final class ConfigStore {
         destinations.filter { $0.accountId == accountId }
     }
 
+    // MARK: - Hidden-destination reveal
+
+    /// Transient reveal switch for hidden destinations, toggled by tapping
+    /// the ShareMaster word mark on the main screen/popover. While off,
+    /// hidden destinations — and accounts used only by them — are concealed
+    /// everywhere, including Settings, so the app is indistinguishable from
+    /// one without them. Never persisted; the main views reset it whenever
+    /// the app leaves the foreground or the popover reopens.
+    var revealHidden = false
+
+    /// Destinations for the current reveal state, sorted.
+    var visibleDestinations: [Destination] {
+        sortedDestinations.filter { revealHidden || !$0.isHidden }
+    }
+
+    /// Accounts for the current reveal state: an account used *only* by
+    /// hidden destinations is concealed along with them. Accounts with no
+    /// destinations are ordinary and always show.
+    var visibleAccounts: [Account] {
+        guard !revealHidden else { return accounts }
+        return accounts.filter { account in
+            let using = destinationsUsing(accountId: account.id)
+            return using.isEmpty || using.contains { !$0.isHidden }
+        }
+    }
+
+    func visibleDestinationsUsing(accountId: UUID) -> [Destination] {
+        destinationsUsing(accountId: accountId).filter { revealHidden || !$0.isHidden }
+    }
+
     /// Builds a fully-resolved config for a destination, pulling the account's
     /// secrets from the Keychain. Returns nil if the account is missing.
     func s3Config(for destination: Destination) -> S3Config? {

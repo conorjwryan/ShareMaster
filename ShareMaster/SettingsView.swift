@@ -37,11 +37,14 @@ struct AccountsSettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if config.accounts.isEmpty {
+            // Filtered through the wordmark reveal: while concealed, accounts
+            // used only by hidden destinations are absent here too, and the
+            // "N dest." count ignores hidden destinations.
+            if config.visibleAccounts.isEmpty {
                 emptyState
             } else {
                 List {
-                    ForEach(config.accounts) { account in
+                    ForEach(config.visibleAccounts) { account in
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(account.name.isEmpty ? "Untitled" : account.name)
@@ -53,7 +56,7 @@ struct AccountsSettingsView: View {
                                     .truncationMode(.middle)
                             }
                             Spacer()
-                            Text("\(config.destinationsUsing(accountId: account.id).count) dest.")
+                            Text("\(config.visibleDestinationsUsing(accountId: account.id).count) dest.")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                             Button {
@@ -107,7 +110,9 @@ struct AccountsSettingsView: View {
 
     private func delete(_ account: Account) {
         if !config.deleteAccount(id: account.id) {
-            let names = config.destinationsUsing(accountId: account.id).map(\.name).joined(separator: ", ")
+            // Only name visible destinations — the delete still fails if a
+            // concealed one uses the account, but we don't reveal it here.
+            let names = config.visibleDestinationsUsing(accountId: account.id).map(\.name).joined(separator: ", ")
             deleteError = "\"\(account.name)\" is used by: \(names). Remove or reassign those destinations first."
         }
     }
@@ -232,7 +237,10 @@ struct DestinationsSettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if config.accounts.isEmpty {
+            // Filtered through the wordmark reveal: while concealed, hidden
+            // destinations are absent and the empty states read as a normal
+            // fresh setup.
+            if config.visibleAccounts.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "tray.full").font(.system(size: 32)).foregroundStyle(.secondary)
                     Text("Add an account first")
@@ -241,7 +249,7 @@ struct DestinationsSettingsView: View {
                         .font(.caption).foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if config.destinations.isEmpty {
+            } else if config.visibleDestinations.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "tray.full").font(.system(size: 32)).foregroundStyle(.secondary)
                     Text("No destinations yet").foregroundStyle(.secondary)
@@ -249,7 +257,7 @@ struct DestinationsSettingsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
-                    ForEach(config.sortedDestinations) { destination in
+                    ForEach(config.visibleDestinations) { destination in
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(destination.name.isEmpty ? "Untitled" : destination.name)
@@ -286,9 +294,9 @@ struct DestinationsSettingsView: View {
             HStack {
                 Button {
                     isNewDestination = true
-                    editingDestination = Destination(accountId: config.accounts.first!.id)
+                    editingDestination = Destination(accountId: config.visibleAccounts.first!.id)
                 } label: { Label("Add Destination", systemImage: "plus") }
-                    .disabled(config.accounts.isEmpty)
+                    .disabled(config.visibleAccounts.isEmpty)
                 Spacer()
             }
             .padding(10)
@@ -334,7 +342,7 @@ struct DestinationEditor: View {
             Section("Destination") {
                 TextField("Name", text: $destination.name, prompt: Text("Backups"))
                 Picker("Account", selection: $destination.accountId) {
-                    ForEach(config.accounts) { account in
+                    ForEach(config.visibleAccounts) { account in
                         Text(account.name.isEmpty ? "Untitled" : account.name).tag(account.id)
                     }
                 }
@@ -392,7 +400,7 @@ struct DestinationEditor: View {
             } header: {
                 Text("Privacy")
             } footer: {
-                Text("Hidden destinations don't appear in the popover, the iOS app or the share sheet until revealed by tapping the ShareMaster word mark (in the popover or the iOS app).")
+                Text("Hidden destinations don't appear anywhere — the popover, the iOS app, the share sheet or these Settings — until revealed by tapping the ShareMaster word mark (in the popover or the iOS app). Accounts used only by hidden destinations are concealed with them.")
             }
 
             Section {

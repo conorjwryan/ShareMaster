@@ -34,8 +34,11 @@ struct IOSSettingsView: View {
                     Text("With Mobile Data off, files upload only over Wi-Fi — browsing and copying links work anywhere. With it on, you'll see how much data an upload will use before it starts, unless warnings are skipped. iCloud Sync shares your accounts and destinations between devices through iCloud Keychain.")
                 }
 
+                // Both sections filter through the wordmark reveal: with it
+                // off, hidden destinations and their dedicated accounts are
+                // absent here too, so Settings looks like an ordinary setup.
                 Section("Accounts") {
-                    ForEach(config.accounts) { account in
+                    ForEach(config.visibleAccounts) { account in
                         Button {
                             editingAccount = account
                         } label: {
@@ -65,7 +68,7 @@ struct IOSSettingsView: View {
                 }
 
                 Section("Destinations") {
-                    ForEach(config.sortedDestinations) { destination in
+                    ForEach(config.visibleDestinations) { destination in
                         Button {
                             editingDestination = destination
                         } label: {
@@ -99,7 +102,7 @@ struct IOSSettingsView: View {
                     } label: {
                         Label("Add Destination", systemImage: "plus")
                     }
-                    .disabled(config.accounts.isEmpty)
+                    .disabled(config.visibleAccounts.isEmpty)
                 }
             }
             .navigationTitle("Settings")
@@ -208,7 +211,7 @@ struct DestinationEditorView: View {
     init(destination: Destination?) {
         self.destination = destination
         isNew = destination == nil
-        let fallbackAccount = ConfigStore.shared.accounts.first?.id ?? UUID()
+        let fallbackAccount = ConfigStore.shared.visibleAccounts.first?.id ?? UUID()
         _draft = State(initialValue: destination ?? Destination(accountId: fallbackAccount))
     }
 
@@ -218,7 +221,7 @@ struct DestinationEditorView: View {
                 Section("Destination") {
                     TextField("Name", text: $draft.name)
                     Picker("Account", selection: $draft.accountId) {
-                        ForEach(ConfigStore.shared.accounts) { account in
+                        ForEach(ConfigStore.shared.visibleAccounts) { account in
                             Text(account.name.isEmpty ? "Untitled" : account.name).tag(account.id)
                         }
                     }
@@ -245,7 +248,7 @@ struct DestinationEditorView: View {
                 } header: {
                     Text("Privacy")
                 } footer: {
-                    Text("Hidden destinations stay out of the main list. Tap the ShareMaster word mark there to reveal them.")
+                    Text("Hidden destinations disappear from the main list and from Settings. Tap the ShareMaster word mark on the main screen to reveal them everywhere.")
                 }
 
                 Section("Link") {

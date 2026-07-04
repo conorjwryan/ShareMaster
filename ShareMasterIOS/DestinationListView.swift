@@ -13,10 +13,9 @@ struct DestinationListView: View {
     @State private var config = ConfigStore.shared
     @State private var uploads = UploadManager.shared
     @State private var showSettings = false
-    @State private var showHidden = false
 
     private var visibleDestinations: [Destination] {
-        config.sortedDestinations.filter { showHidden || !$0.isHidden }
+        config.visibleDestinations
     }
 
     var body: some View {
@@ -42,18 +41,19 @@ struct DestinationListView: View {
             }
             .toolbar {
                 // The word mark doubles as the reveal switch for hidden
-                // destinations; deliberately gives no visual hint.
+                // destinations (here and in Settings); deliberately gives no
+                // visual hint.
                 ToolbarItem(placement: .principal) {
                     Text("ShareMaster")
                         .font(.headline)
                         .onTapGesture {
-                            withAnimation { showHidden.toggle() }
+                            withAnimation { config.revealHidden.toggle() }
                         }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     // Greyed out while every destination is concealed so the
                     // decoy empty state doesn't offer an upload picker.
-                    UploadMenu(includeHidden: showHidden)
+                    UploadMenu(includeHidden: config.revealHidden)
                         .disabled(visibleDestinations.isEmpty)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -74,7 +74,7 @@ struct DestinationListView: View {
                 } else {
                     // Re-conceal hidden destinations whenever the app leaves
                     // the foreground (also keeps them out of the app switcher).
-                    showHidden = false
+                    config.revealHidden = false
                 }
             }
         }
