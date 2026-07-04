@@ -97,20 +97,34 @@ final class UploadManager {
         if NetworkMonitor.shared.isOnCellular {
             let config = ConfigStore.shared
             if !config.allowsCellularUploads {
-                showCellularDisabledAlert = true
+                presentAfterSheetDismissal { self.showCellularDisabledAlert = true }
                 return
             }
             if !config.suppressCellularWarnings {
-                cellularPrompt = CellularPrompt(
+                let prompt = CellularPrompt(
                     files: files,
                     destination: destination,
                     onUploaded: onUploaded,
                     totalBytes: files.reduce(0) { $0 + Self.fileSize($1) }
                 )
+                presentAfterSheetDismissal { self.cellularPrompt = prompt }
                 return
             }
         }
         enqueue(files: files, destination: destination, onUploaded: onUploaded)
+    }
+
+    /// start() is called from inside a picker or destination sheet that is
+    /// dismissing at that very moment. The gate alerts live on the root
+    /// view, and flipping their state mid-dismissal asks SwiftUI to present
+    /// over the outgoing sheet — UIKit drops that silently and never
+    /// retries. Deferring past the dismissal animation lets the alert land
+    /// on the uncovered root view.
+    private func presentAfterSheetDismissal(_ present: @escaping @MainActor () -> Void) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(650))
+            present()
+        }
     }
 
     func confirmCellularUpload() {
