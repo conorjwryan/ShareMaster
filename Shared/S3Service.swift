@@ -462,9 +462,10 @@ actor S3Service {
             throw S3Error(message: "Invalid URL")
         }
 
+        // Body is supplied by upload(for:from:) below — setting httpBody too
+        // makes CFNetwork warn and would race two body sources.
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
-        request.httpBody = data
 
         var signedHeaders: [String: String] = [
             "host": host,

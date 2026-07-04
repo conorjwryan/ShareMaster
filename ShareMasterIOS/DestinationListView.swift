@@ -21,7 +21,10 @@ struct DestinationListView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if config.destinations.isEmpty {
+                // Keyed off *visible* destinations: when every destination is
+                // hidden the list is indistinguishable from a fresh install.
+                // Tapping the wordmark reveals them as usual.
+                if visibleDestinations.isEmpty {
                     emptyState
                 } else {
                     List(visibleDestinations) { destination in
