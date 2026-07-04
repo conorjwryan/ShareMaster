@@ -24,7 +24,7 @@ On iOS, `ConfigStore` reads/writes the App Group `group.com.cjwr.ShareMaster` fo
 
 ## Mobile-data gating
 
-iOS-app-only, uploads-only (browsing and link-copying are never gated; the app has no file-download feature yet). Controlled by the device-local settings `allowsCellularUploads` (default on) and `suppressCellularWarnings` (default off).
+iOS-app-only, uploads-only (browsing, previews, and link-copying are never gated; the app has no file-download feature yet). Controlled by the device-local settings `allowsCellularUploads` (default on) and `suppressCellularWarnings` (default off).
 
 - `NetworkMonitor` (an `@Observable` `NWPathMonitor` wrapper in `UploadManager.swift`) **must be warmed at launch** — it's touched in `UploadManager.init` because the first path reading is asynchronous, so a lazily created monitor always reports "not cellular".
 - On cellular, `UploadManager.start` either shows an "Uploading on Mobile Data Is Disabled" alert (toggle off) or a "~X MB of your mobile data plan" Continue/Cancel prompt (toggle on, warnings not suppressed).

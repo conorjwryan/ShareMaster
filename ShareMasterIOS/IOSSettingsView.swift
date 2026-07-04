@@ -33,7 +33,7 @@ struct IOSSettingsView: View {
                 } header: {
                     Text("Sync")
                 } footer: {
-                    Text("With Mobile Data off, files upload only over Wi-Fi — browsing and copying links work anywhere. With it on, you'll see how much data an upload will use before it starts, unless warnings are skipped. iCloud Sync shares your accounts and destinations between devices through iCloud Keychain.")
+                    Text("With Mobile Data off, files upload only over Wi-Fi — browsing, previews, and copying links work anywhere. With it on, you'll see how much data an upload will use before it starts, unless warnings are skipped. iCloud Sync shares your accounts and destinations between devices through iCloud Keychain.")
                 }
 
                 // Both sections filter through the wordmark reveal: with it

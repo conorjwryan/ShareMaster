@@ -197,19 +197,7 @@ struct ObjectDetailView: View {
         NavigationStack {
             VStack(spacing: 16) {
                 if isImage, let link, let url = URL(string: link) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().aspectRatio(contentMode: .fit)
-                        case .failure:
-                            Label("Preview unavailable", systemImage: "eye.slash")
-                                .foregroundStyle(.secondary)
-                        default:
-                            ProgressView()
-                        }
-                    }
-                    .frame(maxHeight: 320)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    RemoteImagePreview(url: url)
                 } else {
                     Image(systemName: "doc")
                         .font(.system(size: 56))
@@ -286,6 +274,80 @@ struct ObjectDetailView: View {
             try await S3Service.shared.deleteObject(key: object.key, config: config)
             onDelete()
             dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct RemoteImagePreview: View {
+    let url: URL
+
+    @State private var image: Image?
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Group {
+            if let image {
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+            } else if let errorMessage {
+                previewNotice(title: "Preview unavailable", message: errorMessage)
+            } else if isLoading {
+                ProgressView()
+            } else {
+                previewNotice(title: "Preview unavailable", message: "The image preview could not be loaded.")
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 320)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .task(id: url) {
+            await load()
+        }
+    }
+
+    private func previewNotice(title: String, message: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: "eye.slash")
+                .font(.title2)
+                .foregroundStyle(.secondary)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding()
+    }
+
+    private func load() async {
+        isLoading = true
+        image = nil
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let request = URLRequest(url: url)
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            if let http = response as? HTTPURLResponse,
+               !(200...299).contains(http.statusCode) {
+                errorMessage = "The link returned HTTP \(http.statusCode). Copy the link to check whether the file still exists."
+                return
+            }
+
+            guard let uiImage = UIImage(data: data) else {
+                errorMessage = "The link did not return a supported image."
+                return
+            }
+
+            image = Image(uiImage: uiImage)
         } catch {
             errorMessage = error.localizedDescription
         }
