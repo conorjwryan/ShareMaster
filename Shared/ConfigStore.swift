@@ -61,6 +61,54 @@ struct Destination: Codable, Identifiable, Hashable {
     /// by tapping the word mark. Optional so existing stored JSON decodes.
     var hidden: Bool? = nil
 
+    init(name: String = "", accountId: UUID) {
+        self.name = name
+        self.accountId = accountId
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case accountId
+        case bucket
+        case pathPrefix
+        case publicUrlBase
+        case namingTemplate
+        case makePublic
+        case linkMode
+        case presignExpirySeconds
+        case copyOnUpload
+        case sortOrder
+        case uploadCapMBps
+        case downloadCapMBps
+        case maxConcurrentParts
+        case downloadLocation
+        case downloadDirBookmark
+        case hidden
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        accountId = try container.decode(UUID.self, forKey: .accountId)
+        bucket = try container.decodeIfPresent(String.self, forKey: .bucket) ?? ""
+        pathPrefix = try container.decodeIfPresent(String.self, forKey: .pathPrefix) ?? ""
+        publicUrlBase = try container.decodeIfPresent(String.self, forKey: .publicUrlBase) ?? ""
+        namingTemplate = try container.decodeIfPresent(String.self, forKey: .namingTemplate) ?? NamingTemplate.default
+        makePublic = try container.decodeIfPresent(Bool.self, forKey: .makePublic) ?? true
+        linkMode = try container.decodeIfPresent(LinkMode.self, forKey: .linkMode) ?? .publicUrl
+        presignExpirySeconds = try container.decodeIfPresent(Int.self, forKey: .presignExpirySeconds) ?? 86_400
+        copyOnUpload = try container.decodeIfPresent(Bool.self, forKey: .copyOnUpload) ?? true
+        sortOrder = try container.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
+        uploadCapMBps = try container.decodeIfPresent(Double.self, forKey: .uploadCapMBps)
+        downloadCapMBps = try container.decodeIfPresent(Double.self, forKey: .downloadCapMBps)
+        maxConcurrentParts = try container.decodeIfPresent(Int.self, forKey: .maxConcurrentParts)
+        downloadLocation = try container.decodeIfPresent(DownloadLocation.self, forKey: .downloadLocation)
+        downloadDirBookmark = try container.decodeIfPresent(Data.self, forKey: .downloadDirBookmark)
+        hidden = try container.decodeIfPresent(Bool.self, forKey: .hidden)
+    }
+
     var isHidden: Bool {
         get { hidden ?? false }
         set { hidden = newValue }

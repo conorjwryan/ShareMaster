@@ -41,7 +41,7 @@ final class UploadManager {
 
     enum Phase: Equatable {
         case uploading(destinationName: String)
-        case done(fileCount: Int)
+        case done(fileCount: Int, copied: Bool)
         case failed(String)
     }
 
@@ -54,6 +54,7 @@ final class UploadManager {
         let files: [URL]
         let destinationName: String
         let s3Config: S3Config
+        let copyOnUpload: Bool
         let onUploaded: () -> Void
     }
 
@@ -151,6 +152,7 @@ final class UploadManager {
             files: files,
             destinationName: destination.name.isEmpty ? destination.bucket : destination.name,
             s3Config: s3Config,
+            copyOnUpload: s3Config.copyOnUpload,
             onUploaded: onUploaded
         ))
         runIfNeeded()
@@ -192,8 +194,10 @@ final class UploadManager {
                 }
                 links.append(result.url)
             }
-            UIPasteboard.general.string = links.joined(separator: "\n")
-            phase = .done(fileCount: links.count)
+            if batch.copyOnUpload {
+                UIPasteboard.general.string = links.joined(separator: "\n")
+            }
+            phase = .done(fileCount: links.count, copied: batch.copyOnUpload)
             batch.onUploaded()
             scheduleClear()
         } catch {
@@ -236,7 +240,7 @@ final class UploadManager {
 }
 
 /// Floating bar pinned above the bottom safe area while an upload is in
-/// flight, then briefly confirming the links landed on the clipboard.
+/// flight, then briefly confirming completion.
 struct UploadStatusBar: View {
     @State private var manager = UploadManager.shared
 
@@ -255,12 +259,10 @@ struct UploadStatusBar: View {
                             ProgressView(value: manager.progress)
                                 .progressViewStyle(.linear)
                         }
-                    case .done(let fileCount):
+                    case .done(let fileCount, let copied):
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(.green)
-                        Text(fileCount == 1
-                             ? "File uploaded and link copied to clipboard"
-                             : "\(fileCount) files uploaded and links copied to clipboard")
+                        Text(doneMessage(fileCount: fileCount, copied: copied))
                             .font(.subheadline)
                         Spacer(minLength: 0)
                     case .failed(let message):
@@ -289,5 +291,16 @@ struct UploadStatusBar: View {
             }
         }
         .animation(.snappy, value: manager.phase)
+    }
+
+    private func doneMessage(fileCount: Int, copied: Bool) -> String {
+        if copied {
+            return fileCount == 1
+                ? "File uploaded and link copied to clipboard"
+                : "\(fileCount) files uploaded and links copied to clipboard"
+        }
+        return fileCount == 1
+            ? "File uploaded"
+            : "\(fileCount) files uploaded"
     }
 }

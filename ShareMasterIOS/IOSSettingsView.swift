@@ -309,6 +309,7 @@ struct DestinationEditorView: View {
                             Text("1 week").tag(604_800)
                         }
                     }
+                    Toggle("Copy link to clipboard after upload", isOn: $draft.copyOnUpload)
                 }
             }
             .navigationTitle(isNew ? "New Destination" : "Edit Destination")

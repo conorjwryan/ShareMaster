@@ -3,7 +3,7 @@
 //  ShareMasterShareExt
 //
 //  Principal class of the share extension. Hosts the SwiftUI upload flow:
-//  pick a destination → upload → link on the clipboard → auto-dismiss.
+//  pick a destination → upload → optional clipboard copy → auto-dismiss.
 //
 
 import UIKit

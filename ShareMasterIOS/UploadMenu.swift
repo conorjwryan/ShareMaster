@@ -8,7 +8,7 @@
 //  the user keeps browsing — progress shows in the UploadStatusBar. When
 //  used inside the bucket browser the destination is fixed and the upload
 //  starts immediately; from the root list a destination picker sheet is
-//  shown first. Links are copied to the clipboard on completion.
+//  shown first. Destinations can copy links to the clipboard on completion.
 //
 
 import SwiftUI

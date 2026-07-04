@@ -4,7 +4,7 @@
 //
 //  The whole share-sheet flow: attachments load in the background while the
 //  destination list shows; tapping a destination uploads everything to it,
-//  puts the resulting link(s) on the clipboard, flashes a confirmation and
+//  optionally copies the resulting link(s), flashes a confirmation and
 //  dismisses the sheet.
 //
 
@@ -18,7 +18,7 @@ struct ShareUploadView: View {
     private enum Phase {
         case pickingDestination
         case uploading(destination: String)
-        case done(linkCount: Int)
+        case done(linkCount: Int, copied: Bool)
         case failed(String)
     }
 
@@ -63,14 +63,12 @@ struct ShareUploadView: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .done(let linkCount):
+        case .done(let linkCount, let copied):
             VStack(spacing: 12) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 56))
                     .foregroundStyle(.green)
-                Text(linkCount == 1
-                     ? "File uploaded and link copied to clipboard"
-                     : "\(linkCount) files uploaded and links copied to clipboard")
+                Text(doneMessage(linkCount: linkCount, copied: copied))
                     .font(.headline)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
@@ -175,14 +173,27 @@ struct ShareUploadView: View {
                     links.append(result.url)
                 }
 
-                UIPasteboard.general.string = links.joined(separator: "\n")
-                phase = .done(linkCount: links.count)
+                if s3Config.copyOnUpload {
+                    UIPasteboard.general.string = links.joined(separator: "\n")
+                }
+                phase = .done(linkCount: links.count, copied: s3Config.copyOnUpload)
                 try? await Task.sleep(for: .seconds(1.2))
                 onFinish(nil)
             } catch {
                 phase = .failed(error.localizedDescription)
             }
         }
+    }
+
+    private func doneMessage(linkCount: Int, copied: Bool) -> String {
+        if copied {
+            return linkCount == 1
+                ? "File uploaded and link copied to clipboard"
+                : "\(linkCount) files uploaded and links copied to clipboard"
+        }
+        return linkCount == 1
+            ? "File uploaded"
+            : "\(linkCount) files uploaded"
     }
 }
 

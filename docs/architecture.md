@@ -43,4 +43,4 @@ Helper APIs worth knowing: `visibleDestinations` / `visibleAccounts` (respect th
 2. `S3Service` uploads the file — whole-file PUT under 32 MiB, multipart above (see [Transfer engine](transfer-engine.md)) — reporting progress through a single `Double` callback.
 3. The file key is produced by `NamingTemplate.expand` from the destination's template.
 4. The share link is built per the destination's link mode: public URL base + key, or a SigV4-presigned GET with the configured expiry.
-5. The link lands on the pasteboard (NSPasteboard/UIPasteboard) and the UI confirms ("File uploaded and link copied to clipboard" — same wording on iOS in-app and share-extension flows).
+5. If the destination's copy-on-upload setting is enabled, the link lands on the pasteboard (NSPasteboard/UIPasteboard) and the UI confirms with clipboard wording; otherwise the upload finishes without touching the clipboard.

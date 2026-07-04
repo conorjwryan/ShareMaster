@@ -16,9 +16,9 @@ On iOS, `ConfigStore` reads/writes the App Group `group.com.cjwr.ShareMaster` fo
 
 ## In-app uploads: UploadManager
 
-`UploadManager` (`@MainActor @Observable` singleton) makes uploads **non-blocking**: it queues batches, runs them sequentially, copies the resulting link(s) to UIPasteboard, and holds a `beginBackgroundTask` so a transfer survives ~30 s after backgrounding. It is **not** a background `URLSession` — very large files still suspend with the app; a full background-session rework of `S3Service` was scoped and deliberately deferred.
+`UploadManager` (`@MainActor @Observable` singleton) makes uploads **non-blocking**: it queues batches, runs them sequentially, copies the resulting link(s) to UIPasteboard when the destination setting allows it, and holds a `beginBackgroundTask` so a transfer survives ~30 s after backgrounding. It is **not** a background `URLSession` — very large files still suspend with the app; a full background-session rework of `S3Service` was scoped and deliberately deferred.
 
-`UploadStatusBar` (same file) is a floating bottom bar attached via `.safeAreaInset(edge: .bottom)`: progress while uploading → green "File uploaded and link copied to clipboard" (auto-clears after 4 s) → failures persist with an ✕. Uploads started from inside a bucket browser go straight to that destination; uploads from the root list first show a `UploadDestinationPicker` sheet.
+`UploadStatusBar` (same file) is a floating bottom bar attached via `.safeAreaInset(edge: .bottom)`: progress while uploading → green completion message, with clipboard wording only when the destination's copy-on-upload setting is enabled (auto-clears after 4 s) → failures persist with an ✕. Uploads started from inside a bucket browser go straight to that destination; uploads from the root list first show a `UploadDestinationPicker` sheet.
 
 **Presentation rule (bug happened twice):** the status bar and every upload alert must hang off the **NavigationStack itself**, not the root list view — presentations from a covered root don't reliably appear while a bucket view is pushed.
 
