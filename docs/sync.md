@@ -5,6 +5,7 @@ Config (accounts, destinations, settings) and credentials sync between macOS and
 ## Mechanism
 
 - All per-account secrets **and** a whole-config JSON payload (keychain item `cloud_config_payload`) are stored as `kSecAttrSynchronizable` keychain items in the shared access group `HU9TH52NNC.com.cjwr.ShareMaster.sync`. The entitlement `$(AppIdentifierPrefix)com.cjwr.ShareMaster.sync` is present in all three targets; on macOS the queries additionally need `kSecUseDataProtectionKeychain`.
+- Account/destination transfer settings are part of that synced config: account upload/download caps and concurrent-part defaults sync, and destination overrides sync with the destination.
 - Conflict resolution is **last-writer-wins**: the payload carries an `updatedAt` timestamp compared against the locally stored `config_cloud_updated_at`; `adoptCloudIfNewer()` bails when the versions match (so polling is cheap — one keychain read).
 - Every local mutation calls `pushToCloud()` (guarded by `isAdoptingCloud` so adopting a remote payload doesn't immediately re-push it).
 

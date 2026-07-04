@@ -208,6 +208,22 @@ struct AccountEditorView: View {
                 } footer: {
                     Text("Stored in the keychain and shared with the share extension.")
                 }
+                Section {
+                    TextField("Upload limit (MB/s)", value: $draft.uploadCapMBps, format: .number)
+                        .keyboardType(.decimalPad)
+                    TextField("Download limit (MB/s)", value: $draft.downloadCapMBps, format: .number)
+                        .keyboardType(.decimalPad)
+                    Picker("Concurrent parts", selection: $draft.maxConcurrentParts) {
+                        Text("Default (4)").tag(Int?.none)
+                        ForEach([1, 2, 4, 6, 8, 12, 16], id: \.self) { n in
+                            Text("\(n)").tag(Int?.some(n))
+                        }
+                    }
+                } header: {
+                    Text("Transfers")
+                } footer: {
+                    Text("These account defaults apply unless a destination overrides them. Leave limits empty for unlimited speed.")
+                }
             }
             .navigationTitle(isNew ? "New Account" : "Edit Account")
             .navigationBarTitleDisplayMode(.inline)
@@ -238,13 +254,16 @@ struct DestinationEditorView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var draft: Destination
+    @State private var overrideTransfers: Bool
     private let isNew: Bool
 
     init(destination: Destination?) {
         self.destination = destination
         isNew = destination == nil
         let fallbackAccount = ConfigStore.shared.visibleAccounts.first?.id ?? UUID()
-        _draft = State(initialValue: destination ?? Destination(accountId: fallbackAccount))
+        let existing = destination ?? Destination(accountId: fallbackAccount)
+        _draft = State(initialValue: existing)
+        _overrideTransfers = State(initialValue: Self.hasTransferOverrides(existing))
     }
 
     /// Duplicate flow: a fresh draft copied from `source`; nothing is stored
@@ -252,7 +271,9 @@ struct DestinationEditorView: View {
     init(duplicating source: Destination) {
         destination = nil
         isNew = true
-        _draft = State(initialValue: ConfigStore.shared.duplicateDraft(of: source))
+        let copy = ConfigStore.shared.duplicateDraft(of: source)
+        _draft = State(initialValue: copy)
+        _overrideTransfers = State(initialValue: Self.hasTransferOverrides(copy))
     }
 
     var body: some View {
@@ -311,6 +332,27 @@ struct DestinationEditorView: View {
                     }
                     Toggle("Copy link to clipboard after upload", isOn: $draft.copyOnUpload)
                 }
+
+                Section {
+                    Toggle("Override account transfer settings", isOn: $overrideTransfers)
+                    TextField("Upload limit (MB/s)", value: $draft.uploadCapMBps, format: .number)
+                        .keyboardType(.decimalPad)
+                        .disabled(!overrideTransfers)
+                    TextField("Download limit (MB/s)", value: $draft.downloadCapMBps, format: .number)
+                        .keyboardType(.decimalPad)
+                        .disabled(!overrideTransfers)
+                    Picker("Concurrent parts", selection: $draft.maxConcurrentParts) {
+                        Text("Account default").tag(Int?.none)
+                        ForEach([1, 2, 4, 6, 8, 12, 16], id: \.self) { n in
+                            Text("\(n)").tag(Int?.some(n))
+                        }
+                    }
+                    .disabled(!overrideTransfers)
+                } header: {
+                    Text("Transfers")
+                } footer: {
+                    Text("Destinations normally inherit their account's transfer defaults. Turn this on to tune just this destination.")
+                }
             }
             .navigationTitle(isNew ? "New Destination" : "Edit Destination")
             .navigationBarTitleDisplayMode(.inline)
@@ -319,13 +361,26 @@ struct DestinationEditorView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        ConfigStore.shared.upsertDestination(draft)
-                        dismiss()
-                    }
+                    Button("Save") { save() }
                     .disabled(draft.name.isEmpty || draft.bucket.isEmpty)
                 }
             }
         }
+    }
+
+    private static func hasTransferOverrides(_ destination: Destination) -> Bool {
+        destination.uploadCapMBps != nil
+            || destination.downloadCapMBps != nil
+            || destination.maxConcurrentParts != nil
+    }
+
+    private func save() {
+        if !overrideTransfers {
+            draft.uploadCapMBps = nil
+            draft.downloadCapMBps = nil
+            draft.maxConcurrentParts = nil
+        }
+        ConfigStore.shared.upsertDestination(draft)
+        dismiss()
     }
 }

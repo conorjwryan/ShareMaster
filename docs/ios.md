@@ -10,7 +10,7 @@ On iOS, `ConfigStore` reads/writes the App Group `group.com.cjwr.ShareMaster` fo
 
 - `ShareMasterIOSApp.swift` — entry point; also warms `NetworkMonitor` at launch (see below).
 - `DestinationListView` — root list of destinations → navigates to `BucketBrowserView` (browse objects, copy links, delete). The `NavigationStack` here carries the upload status bar and all upload alerts.
-- `IOSSettingsView` — account/destination editors (with Duplicate), Sync section, cellular toggles.
+- `IOSSettingsView` — account/destination editors (with Duplicate), account transfer defaults, per-destination transfer overrides, Sync section, cellular toggles.
 - `UploadMenu` — the toolbar "+": Photo Library (PhotosPicker/`Transferable`, copied to a temp file) and Files (`fileImporter`, security-scoped temp copy).
 - `UploadManager` — see next section.
 
