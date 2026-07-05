@@ -314,6 +314,18 @@ struct DestinationEditorView: View {
                 }
 
                 Section {
+                    Picker("Sort files by", selection: $draft.defaultBrowserSort) {
+                        ForEach(BrowserSort.allCases) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                } header: {
+                    Text("Browsing")
+                } footer: {
+                    Text("How the file browser orders this destination's folders by default. You can still change the order for a single visit from the \u{2026} menu.")
+                }
+
+                Section {
                     Toggle("Hide from main list", isOn: $draft.isHidden)
                 } header: {
                     Text("Privacy")

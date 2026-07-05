@@ -60,6 +60,9 @@ struct Destination: Codable, Identifiable, Hashable {
     /// Hidden destinations don't appear in the iOS main list until revealed
     /// by tapping the word mark. Optional so existing stored JSON decodes.
     var hidden: Bool? = nil
+    /// Default ordering for this destination's bucket browser. Optional so
+    /// existing stored JSON decodes; nil means recently uploaded first.
+    var browserSort: BrowserSort? = nil
 
     init(name: String = "", accountId: UUID) {
         self.name = name
@@ -85,6 +88,7 @@ struct Destination: Codable, Identifiable, Hashable {
         case downloadLocation
         case downloadDirBookmark
         case hidden
+        case browserSort
     }
 
     init(from decoder: Decoder) throws {
@@ -107,6 +111,7 @@ struct Destination: Codable, Identifiable, Hashable {
         downloadLocation = try container.decodeIfPresent(DownloadLocation.self, forKey: .downloadLocation)
         downloadDirBookmark = try container.decodeIfPresent(Data.self, forKey: .downloadDirBookmark)
         hidden = try container.decodeIfPresent(Bool.self, forKey: .hidden)
+        browserSort = try container.decodeIfPresent(BrowserSort.self, forKey: .browserSort)
     }
 
     var isHidden: Bool {
@@ -114,8 +119,29 @@ struct Destination: Codable, Identifiable, Hashable {
         set { hidden = newValue }
     }
 
+    var defaultBrowserSort: BrowserSort {
+        get { browserSort ?? .recentFirst }
+        set { browserSort = newValue }
+    }
+
     nonisolated var effectiveDownloadLocation: DownloadLocation {
         downloadLocation ?? (downloadDirBookmark != nil ? .custom : .downloads)
+    }
+}
+
+/// How the bucket browser orders a folder's contents.
+enum BrowserSort: String, Codable, CaseIterable, Identifiable {
+    case recentFirst       // newest uploads first
+    case nameAscending     // A → Z (S3's native listing order)
+    case nameDescending    // Z → A
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .recentFirst: "Recently Uploaded"
+        case .nameAscending: "Name (A to Z)"
+        case .nameDescending: "Name (Z to A)"
+        }
     }
 }
 

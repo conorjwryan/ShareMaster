@@ -36,9 +36,23 @@ struct BucketBrowserView: View {
     @State private var newDestinationName = ""
     @State private var didSaveDestination = false
     @State private var editingDestination: Destination?
+    /// Sort picked from the "…" menu for this view only; nil falls back to
+    /// the destination's default.
+    @State private var sortOverride: BrowserSort?
+    /// The sort the current listing was loaded with, so we know whether a
+    /// settings change requires a reload.
+    @State private var loadedSort: BrowserSort?
 
     private var config: S3Config? {
         ConfigStore.shared.s3Config(for: destination)
+    }
+
+    /// Effective sort: menu override first, then the stored destination's
+    /// default (read live so edits made in the settings sheet apply).
+    private var sort: BrowserSort {
+        sortOverride
+            ?? ConfigStore.shared.destinations.first { $0.id == destination.id }?.defaultBrowserSort
+            ?? destination.defaultBrowserSort
     }
 
     private var listPrefix: String {
@@ -120,6 +134,18 @@ struct BucketBrowserView: View {
                     Task { await refresh() }
                 }
                 Menu {
+                    Picker("Sort By", selection: Binding(
+                        get: { sort },
+                        set: { sortOverride = $0 }
+                    )) {
+                        ForEach(BrowserSort.allCases) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Divider()
+
                     if let existing = destinationAtThisPrefix {
                         Button {
                             editingDestination = existing
@@ -156,7 +182,15 @@ struct BucketBrowserView: View {
         }
         .task { await refresh() }
         .refreshable { await refresh() }
-        .sheet(item: $editingDestination) { dest in
+        .onChange(of: sortOverride) { _, _ in
+            Task { await refresh() }
+        }
+        .sheet(item: $editingDestination, onDismiss: {
+            // The editor may have changed the destination's default sort.
+            if sortOverride == nil, loadedSort != sort {
+                Task { await refresh() }
+            }
+        }) { dest in
             DestinationEditorView(destination: dest)
         }
         .sheet(item: $selectedObject) { object in
@@ -281,20 +315,62 @@ struct BucketBrowserView: View {
             errorMessage = "Destination not configured"
             return
         }
+        let sort = self.sort
         isLoading = true
         defer { isLoading = false }
         do {
-            let page = try await S3Service.shared.listDirectory(
-                config: config, prefix: listPrefix, pageSize: Self.pageSize
-            )
-            folders = page.folders
-            objects = page.objects
-            nextToken = page.nextContinuationToken
+            if sort == .nameAscending {
+                // S3 already lists names ascending, so page lazily.
+                let page = try await S3Service.shared.listDirectory(
+                    config: config, prefix: listPrefix, pageSize: Self.pageSize
+                )
+                folders = page.folders
+                objects = page.objects
+                nextToken = page.nextContinuationToken
+            } else {
+                // Other orders can't be paged from S3 — fetch the whole
+                // level (bounded so a huge folder can't spin forever) and
+                // sort client-side.
+                var allFolders: [S3Folder] = []
+                var allObjects: [S3Object] = []
+                var token: String?
+                for _ in 0..<25 {
+                    let page = try await S3Service.shared.listDirectory(
+                        config: config, prefix: listPrefix,
+                        continuationToken: token, pageSize: 200
+                    )
+                    allFolders.append(contentsOf: page.folders)
+                    allObjects.append(contentsOf: page.objects)
+                    token = page.nextContinuationToken
+                    if token == nil { break }
+                }
+                (folders, objects) = Self.sorted(folders: allFolders, objects: allObjects, by: sort)
+                nextToken = nil
+            }
+            loadedSort = sort
             errorMessage = nil
             isPermissionError = false
         } catch {
             errorMessage = error.localizedDescription
             isPermissionError = (error as? S3Service.S3Error)?.isPermissionIssue ?? false
+        }
+    }
+
+    /// Applies the chosen order. Folders have no upload date, so recent-first
+    /// keeps them in S3's name order.
+    private static func sorted(
+        folders: [S3Folder], objects: [S3Object], by sort: BrowserSort
+    ) -> ([S3Folder], [S3Object]) {
+        switch sort {
+        case .nameAscending:
+            (folders, objects)
+        case .nameDescending:
+            (
+                folders.sorted { $0.name.localizedStandardCompare($1.name) == .orderedDescending },
+                objects.sorted { $0.filename.localizedStandardCompare($1.filename) == .orderedDescending }
+            )
+        case .recentFirst:
+            (folders, objects.sorted { $0.lastModified > $1.lastModified })
         }
     }
 
