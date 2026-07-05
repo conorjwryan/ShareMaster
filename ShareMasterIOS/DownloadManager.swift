@@ -29,6 +29,9 @@ final class DownloadManager {
     /// Keys currently queued or downloading, so rows can show a spinner
     /// instead of offering a second download.
     private(set) var activeKeys: Set<String> = []
+    /// The key actually transferring right now (activeKeys also holds
+    /// queued jobs, whose progress isn't `progress`).
+    private(set) var currentKey: String?
 
     private struct Job {
         let object: S3Object
@@ -64,6 +67,13 @@ final class DownloadManager {
 
     func isActive(_ object: S3Object) -> Bool {
         activeKeys.contains(object.key)
+    }
+
+    /// Progress for one object: its live fraction while transferring,
+    /// 0 while queued behind another job, nil when not active at all.
+    func progress(for object: S3Object) -> Double? {
+        guard activeKeys.contains(object.key) else { return nil }
+        return currentKey == object.key ? progress : 0
     }
 
     func start(object: S3Object, destination: Destination) {
@@ -138,8 +148,12 @@ final class DownloadManager {
 
     private func run(_ job: Job) async {
         progress = 0
+        currentKey = job.object.key
         phase = .downloading(filename: job.object.filename)
-        defer { activeKeys.remove(job.object.key) }
+        defer {
+            activeKeys.remove(job.object.key)
+            currentKey = nil
+        }
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
             .appendingPathComponent((job.object.key as NSString).lastPathComponent)
@@ -241,15 +255,37 @@ struct DownloadStatusBar: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                .modifier(FrostedGlassBar())
                 .padding(.horizontal, 12)
-                .padding(.bottom, 4)
+                .padding(.bottom, 6)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(.snappy, value: manager.phase)
+    }
+}
+
+/// A frosted "liquid glass" pill background: bright and clearly separated
+/// from whatever's behind it, unlike a plain material that tends to blend
+/// into a similarly-coloured background. Uses real Liquid Glass on iOS 26+,
+/// falling back to a white-tinted blur with a hairline edge and soft shadow.
+private struct FrostedGlassBar: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular, in: .capsule)
+        } else {
+            content
+                .background {
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay(Capsule().fill(.white.opacity(0.4)))
+                        .overlay(Capsule().strokeBorder(.white.opacity(0.6), lineWidth: 0.5))
+                }
+                .shadow(color: .black.opacity(0.18), radius: 14, y: 5)
+        }
     }
 }

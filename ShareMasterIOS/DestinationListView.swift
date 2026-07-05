@@ -90,15 +90,14 @@ struct DestinationListView: View {
                 }
             }
         }
-        // Status bar and mobile-data alerts sit on the NavigationStack, not
-        // the root list: uploads also start from pushed bucket browsers, and
+        // The status bars live in their own overlay window (StatusOverlay)
+        // so they stay visible above sheets — e.g. a download started from
+        // the file detail sheet. Attached here because the root view is the
+        // first thing on screen once a window scene exists.
+        .onAppear { StatusOverlay.shared.attach() }
+        // Mobile-data alerts sit on the NavigationStack, not the root list:
+        // transfers also start from pushed bucket browsers, and
         // presentations from a covered root view don't reliably appear.
-        .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 0) {
-                DownloadStatusBar()
-                UploadStatusBar()
-            }
-        }
         // Mobile-data gate: uploads attempted on cellular land in one of
         // these two alerts (see UploadManager.start).
         .alert(

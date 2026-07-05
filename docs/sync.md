@@ -26,9 +26,11 @@ Legacy keychain items (macOS login keychain from the pre-sync era, iOS app-group
 
 ## Device-local settings (deliberately NOT synced)
 
-`iCloudSyncEnabled` (default on), `allowsCellularUploads` (default on), and `suppressCellularWarnings` (default off) are per-device UserDefaults and excluded from the synced payload — turning sync off on one device must not propagate, and cellular preferences are inherently per-device. `iCloudSyncEnabled` gates `startCloudSync`/`pushToCloud`/`adoptCloudIfNewer`; re-enabling it adopts the cloud payload first, then pushes.
+`iCloudSyncEnabled` (default on), `allowsCellularUploads` (default on; gates both uploads and downloads despite the name — labelled "Transfer on Mobile Data"), `suppressCellularWarnings` (default off), the preview toggles (`rendersFullImagePreviews`, `requiresTapForCellularPreviews`), and `showsDownloadsInFilesApp` (default on) are per-device UserDefaults and excluded from the synced payload — turning sync off on one device must not propagate, and cellular/storage preferences are inherently per-device. `iCloudSyncEnabled` gates `startCloudSync`/`pushToCloud`/`adoptCloudIfNewer`; re-enabling it adopts the cloud payload first, then pushes.
 
-Settings UI: iOS has a Sync section in `IOSSettingsView` (three toggles; "suppress warnings" is disabled unless cellular uploads are allowed); macOS has a Sync tab in `SettingsView` between Destinations and About.
+Downloaded files themselves ([iOS downloads](ios.md#downloads--offline-files)) are also strictly per-device: the manifest and local copies never sync — each device downloads its own.
+
+Settings UI: iOS has a Sync section in `IOSSettingsView` (three toggles; "suppress warnings" is disabled unless mobile-data transfers are allowed) plus Previews and Downloads sections; macOS has a Sync tab in `SettingsView` between Destinations and About.
 
 ## Requirements & known limitations
 

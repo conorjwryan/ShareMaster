@@ -31,7 +31,7 @@ The two user-facing concepts, both defined in `Shared/ConfigStore.swift`:
 - **Non-secret config** — Codable JSON in UserDefaults. On iOS both the app and the share extension read the **App Group** suite `group.com.cjwr.ShareMaster`; macOS uses standard defaults.
 - **Secrets** — never in UserDefaults. Keychain items keyed per account (`account_<uuid>_accessKeyId` / `account_<uuid>_secret`, service `com.cjwr.ShareMaster`). Synchronizable items live in the shared access group `HU9TH52NNC.com.cjwr.ShareMaster.sync` so they ride iCloud Keychain across devices (details in [Sync](sync.md)).
 
-Other notable ConfigStore state: `recentScope`, `recentLimit` (default 5), `recentsExpanded`, `pinPopover`, `lastSelectedDestinationID` (macOS popover selection persistence), `revealHidden` (transient, never persisted), and the device-local sync/cellular toggles (`iCloudSyncEnabled`, `allowsCellularUploads`, `suppressCellularWarnings`).
+Other notable ConfigStore state: `recentScope`, `recentLimit` (default 5), `recentsExpanded`, `pinPopover`, `lastSelectedDestinationID` (macOS popover selection persistence), `revealHidden` (transient, never persisted), and the device-local toggles (`iCloudSyncEnabled`, `allowsCellularUploads` — gates uploads *and* downloads, `suppressCellularWarnings`, `rendersFullImagePreviews`, `requiresTapForCellularPreviews`, `showsDownloadsInFilesApp`).
 
 **Critical convention:** any new Codable field on `Account`/`Destination` **must be an optional** decoded with `decodeIfPresent` — otherwise previously stored JSON (local *and* synced from other devices) fails to decode and the user's config disappears. Default-on Bool settings stored in UserDefaults must load via a `defaults.object(forKey:) != nil` guard so an unset key reads as `true`.
 

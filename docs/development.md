@@ -45,6 +45,5 @@ The transfer engine was validated end-to-end against Cloudflare R2 with a throwa
 ## Things that don't exist (don't go looking)
 
 - No Import/Export or CyberDuck-compatibility feature.
-- No background `URLSession` on iOS (deliberately deferred — uploads get a ~30 s background-task grace, then suspend).
-- No file downloads in the iOS app (browse + copy link only).
+- No background `URLSession` on iOS (deliberately deferred — transfers get a ~30 s background-task grace, then suspend; applies to downloads too).
 - No tests target as of 2026-07-04.

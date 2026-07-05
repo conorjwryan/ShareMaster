@@ -615,8 +615,9 @@ struct ObjectDetailView: View {
                     )
                 } else if isVideo, let localURL {
                     // Downloaded video: play in place with the standard iOS
-                    // player controls (fullscreen, AirPlay, scrubbing).
-                    VideoPlayer(player: player)
+                    // player controls. AVPlayerViewController (not SwiftUI's
+                    // VideoPlayer) so the fullscreen button is available.
+                    VideoPlayerView(player: player)
                         .frame(maxWidth: .infinity)
                         .frame(height: 320)
                         .background(Color(.secondarySystemBackground))
@@ -712,11 +713,18 @@ struct ObjectDetailView: View {
                         .buttonStyle(.bordered)
                     }
 
-                    if downloads.isActive(object) {
-                        Label("Downloading…", systemImage: "arrow.down.circle")
-                            .frame(maxWidth: .infinity)
+                    if let progress = downloads.progress(for: object) {
+                        VStack(spacing: 6) {
+                            Label(
+                                progress > 0 ? "Downloading… \(Int(progress * 100))%" : "Waiting to download…",
+                                systemImage: "arrow.down.circle"
+                            )
                             .foregroundStyle(.secondary)
-                            .padding(.vertical, 6)
+                            ProgressView(value: progress)
+                                .progressViewStyle(.linear)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
                     } else if downloadState != .downloaded {
                         Button {
                             downloads.start(object: object, destination: destination)
@@ -803,6 +811,24 @@ struct ObjectDetailView: View {
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+/// AVPlayerViewController wrapper: unlike SwiftUI's VideoPlayer it offers
+/// the full system transport bar, including the fullscreen button.
+struct VideoPlayerView: UIViewControllerRepresentable {
+    let player: AVPlayer?
+
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let controller = AVPlayerViewController()
+        controller.player = player
+        return controller
+    }
+
+    func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
+        if controller.player !== player {
+            controller.player = player
         }
     }
 }
