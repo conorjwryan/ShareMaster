@@ -54,6 +54,9 @@ final class UploadManager {
         let files: [URL]
         let destinationName: String
         let s3Config: S3Config
+        /// Overrides the destination's path prefix (folder open in the
+        /// browser); nil uploads to the destination's configured prefix.
+        let keyPrefix: String?
         let copyOnUpload: Bool
         let onUploaded: () -> Void
     }
@@ -70,6 +73,7 @@ final class UploadManager {
         let id = UUID()
         let files: [URL]
         let destination: Destination
+        let keyPrefix: String?
         let onUploaded: () -> Void
         let totalBytes: Int64
 
@@ -94,7 +98,7 @@ final class UploadManager {
         _ = NetworkMonitor.shared
     }
 
-    func start(files: [URL], destination: Destination, onUploaded: @escaping () -> Void = {}) {
+    func start(files: [URL], destination: Destination, keyPrefix: String? = nil, onUploaded: @escaping () -> Void = {}) {
         if NetworkMonitor.shared.isOnCellular {
             let config = ConfigStore.shared
             if !config.allowsCellularUploads {
@@ -105,6 +109,7 @@ final class UploadManager {
                 let prompt = CellularPrompt(
                     files: files,
                     destination: destination,
+                    keyPrefix: keyPrefix,
                     onUploaded: onUploaded,
                     totalBytes: files.reduce(0) { $0 + Self.fileSize($1) }
                 )
@@ -112,7 +117,7 @@ final class UploadManager {
                 return
             }
         }
-        enqueue(files: files, destination: destination, onUploaded: onUploaded)
+        enqueue(files: files, destination: destination, keyPrefix: keyPrefix, onUploaded: onUploaded)
     }
 
     /// start() is called from inside a picker or destination sheet that is
@@ -131,7 +136,7 @@ final class UploadManager {
     func confirmCellularUpload() {
         guard let prompt = cellularPrompt else { return }
         cellularPrompt = nil
-        enqueue(files: prompt.files, destination: prompt.destination, onUploaded: prompt.onUploaded)
+        enqueue(files: prompt.files, destination: prompt.destination, keyPrefix: prompt.keyPrefix, onUploaded: prompt.onUploaded)
     }
 
     func cancelCellularUpload() {
@@ -142,7 +147,7 @@ final class UploadManager {
         (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
     }
 
-    private func enqueue(files: [URL], destination: Destination, onUploaded: @escaping () -> Void) {
+    private func enqueue(files: [URL], destination: Destination, keyPrefix: String?, onUploaded: @escaping () -> Void) {
         guard let s3Config = ConfigStore.shared.s3Config(for: destination) else {
             phase = .failed("This destination's account is missing its credentials.")
             return
@@ -150,12 +155,24 @@ final class UploadManager {
         ConfigStore.shared.lastSelectedDestinationID = destination.id
         queue.append(Batch(
             files: files,
-            destinationName: destination.name.isEmpty ? destination.bucket : destination.name,
+            destinationName: Self.displayName(destination: destination, keyPrefix: keyPrefix, configuredPrefix: s3Config.pathPrefix),
             s3Config: s3Config,
+            keyPrefix: keyPrefix,
             copyOnUpload: s3Config.copyOnUpload,
             onUploaded: onUploaded
         ))
         runIfNeeded()
+    }
+
+    /// Status-bar label for where a batch is going. The destination's name
+    /// covers its configured prefix; a browsed-to folder shows its own name
+    /// (or the bucket for the root) so the bar matches where files land.
+    private static func displayName(destination: Destination, keyPrefix: String?, configuredPrefix: String) -> String {
+        let destinationName = destination.name.isEmpty ? destination.bucket : destination.name
+        guard let keyPrefix, keyPrefix != configuredPrefix else { return destinationName }
+        guard !keyPrefix.isEmpty else { return destination.bucket }
+        let folder = (String(keyPrefix.dropLast()) as NSString).lastPathComponent
+        return "\(destination.bucket)/\(folder)"
     }
 
     /// Dismisses a lingering done/failed bar (uploading can't be dismissed).
@@ -187,7 +204,7 @@ final class UploadManager {
         do {
             var links: [String] = []
             for (index, file) in batch.files.enumerated() {
-                let result = try await S3Service.shared.upload(fileURL: file, config: batch.s3Config) { fileProgress in
+                let result = try await S3Service.shared.upload(fileURL: file, config: batch.s3Config, keyPrefix: batch.keyPrefix) { fileProgress in
                     Task { @MainActor in
                         self.progress = (Double(index) + fileProgress) / Double(batch.files.count)
                     }

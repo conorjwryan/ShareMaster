@@ -18,6 +18,9 @@ import UniformTypeIdentifiers
 struct UploadMenu: View {
     /// Upload straight to this destination when set; otherwise ask.
     var destination: Destination? = nil
+    /// Key prefix to upload under (the folder open in the browser).
+    /// nil uses the destination's configured path prefix.
+    var keyPrefix: String? = nil
     /// Whether the destination picker includes hidden destinations —
     /// mirrors the main list's reveal state.
     var includeHidden = false
@@ -80,7 +83,7 @@ struct UploadMenu: View {
     private func handlePicked(_ files: [URL]) {
         guard !files.isEmpty else { return }
         if let destination {
-            UploadManager.shared.start(files: files, destination: destination, onUploaded: onUploaded)
+            UploadManager.shared.start(files: files, destination: destination, keyPrefix: keyPrefix, onUploaded: onUploaded)
         } else {
             uploadRequest = UploadRequest(files: files)
         }

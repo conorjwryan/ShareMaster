@@ -112,7 +112,7 @@ struct BucketBrowserView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                UploadMenu(destination: destination) {
+                UploadMenu(destination: destination, keyPrefix: listPrefix) {
                     Task { await refresh() }
                 }
             }

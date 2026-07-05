@@ -96,14 +96,17 @@ actor S3Service {
 
     // MARK: - Upload
 
-    func upload(fileURL: URL, config: S3Config, progress: ((Double) -> Void)? = nil) async throws -> UploadResult {
+    /// - Parameter keyPrefix: overrides the destination's configured path
+    ///   prefix (e.g. the folder currently open in the bucket browser).
+    ///   Pass "" to upload to the bucket root; nil uses the config's prefix.
+    func upload(fileURL: URL, config: S3Config, keyPrefix: String? = nil, progress: ((Double) -> Void)? = nil) async throws -> UploadResult {
         guard config.isConfigured else {
             throw S3Error(message: "Destination not configured. Please check its account and bucket in settings.")
         }
 
         let filename = fileURL.lastPathComponent
         let basename = NamingTemplate.expand(config.namingTemplate, filename: filename)
-        let key = config.pathPrefix + basename
+        let key = (keyPrefix ?? config.pathPrefix) + basename
         let contentType = mimeType(for: fileURL.pathExtension)
 
         let fileSize = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int64) ?? 0
