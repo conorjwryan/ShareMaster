@@ -45,6 +45,9 @@ struct BucketBrowserView: View {
     @State private var isShowingOfflineCache = false
     /// Object awaiting delete confirmation (swipe or context menu).
     @State private var pendingDelete: S3Object?
+    /// Object awaiting remove-download confirmation. Distinct from
+    /// pendingDelete: this only frees local space, never touches the remote.
+    @State private var pendingRemoveDownload: S3Object?
     /// Downloaded file being exported via the Files document picker.
     @State private var exportItem: ExportItem?
     @State private var showNewDestinationPrompt = false
@@ -282,10 +285,20 @@ struct BucketBrowserView: View {
                 }
                 .foregroundStyle(.primary)
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button(role: .destructive) {
-                        pendingDelete = object
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                    // No remote delete without a connection — offer to free
+                    // the local copy instead, which needs no network.
+                    if network.isConnected {
+                        Button(role: .destructive) {
+                            pendingDelete = object
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    } else if state != .notDownloaded {
+                        Button(role: .destructive) {
+                            pendingRemoveDownload = object
+                        } label: {
+                            Label("Remove Download", systemImage: "arrow.down.circle.dotted")
+                        }
                     }
                 }
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
@@ -328,16 +341,20 @@ struct BucketBrowserView: View {
                             Label("Export…", systemImage: "square.and.arrow.up.on.square")
                         }
                         Button(role: .destructive) {
-                            downloadStore.remove(for: object, destination: destination)
+                            pendingRemoveDownload = object
                         } label: {
                             Label("Remove Download", systemImage: "arrow.down.circle.dotted")
                         }
                     }
-                    Divider()
-                    Button(role: .destructive) {
-                        pendingDelete = object
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                    // Deleting the remote object needs the network; offline the
+                    // "Remove Download" action above is the only destructive one.
+                    if network.isConnected {
+                        Divider()
+                        Button(role: .destructive) {
+                            pendingDelete = object
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 }
                 // Attached to the row (not the List) so iOS anchors the
@@ -357,6 +374,22 @@ struct BucketBrowserView: View {
                     Button("Cancel", role: .cancel) { pendingDelete = nil }
                 } message: {
                     Text(deleteMessage(for: object))
+                }
+                .confirmationDialog(
+                    "Remove downloaded copy of \u{201C}\(object.filename)\u{201D}?",
+                    isPresented: Binding(
+                        get: { pendingRemoveDownload?.id == object.id },
+                        set: { if !$0 { pendingRemoveDownload = nil } }
+                    ),
+                    titleVisibility: .visible
+                ) {
+                    Button("Remove Download", role: .destructive) {
+                        pendingRemoveDownload = nil
+                        downloadStore.remove(for: object, destination: destination)
+                    }
+                    Button("Cancel", role: .cancel) { pendingRemoveDownload = nil }
+                } message: {
+                    Text("This only removes the copy on this device to free up space. The file still exists in \(destination.bucket) and can be downloaded again.")
                 }
             }
 
@@ -648,12 +681,14 @@ struct ObjectDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var downloadStore = DownloadStore.shared
     @State private var downloads = DownloadManager.shared
+    @State private var network = NetworkMonitor.shared
     @State private var link: String?
     @State private var copied = false
     @State private var errorMessage: String?
     @State private var showQuickLook = false
     @State private var exportItem: ExportItem?
     @State private var confirmDelete = false
+    @State private var confirmRemoveDownload = false
     /// Player for downloaded videos; created when the preview appears.
     @State private var player: AVPlayer?
 
@@ -822,35 +857,51 @@ struct ObjectDetailView: View {
                         .buttonStyle(.bordered)
 
                         Button(role: .destructive) {
-                            downloadStore.remove(for: object, destination: destination)
+                            confirmRemoveDownload = true
                         } label: {
                             Label("Remove Download", systemImage: "arrow.down.circle.dotted")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
+                        .confirmationDialog(
+                            "Remove downloaded copy of \u{201C}\(object.filename)\u{201D}?",
+                            isPresented: $confirmRemoveDownload,
+                            titleVisibility: .visible
+                        ) {
+                            Button("Remove Download", role: .destructive) {
+                                downloadStore.remove(for: object, destination: destination)
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("This only removes the copy on this device to free up space. The file still exists in \(destination.bucket) and can be downloaded again.")
+                        }
                     }
 
-                    Button(role: .destructive) {
-                        confirmDelete = true
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    // On the button itself so the dialog anchors to it.
-                    .confirmationDialog(
-                        "Delete \u{201C}\(object.filename)\u{201D}?",
-                        isPresented: $confirmDelete,
-                        titleVisibility: .visible
-                    ) {
-                        Button("Delete", role: .destructive) {
-                            Task { await deleteObject() }
+                    // Deleting the remote file needs a connection; offline,
+                    // "Remove Download" above is the only destructive action.
+                    if network.isConnected {
+                        Button(role: .destructive) {
+                            confirmDelete = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                                .frame(maxWidth: .infinity)
                         }
-                        Button("Cancel", role: .cancel) {}
-                    } message: {
-                        Text(downloadState == .notDownloaded
-                            ? "This permanently deletes the file from \(destination.bucket)."
-                            : "This permanently deletes the file from \(destination.bucket). Its downloaded copy on this device is removed too.")
+                        .buttonStyle(.bordered)
+                        // On the button itself so the dialog anchors to it.
+                        .confirmationDialog(
+                            "Delete \u{201C}\(object.filename)\u{201D}?",
+                            isPresented: $confirmDelete,
+                            titleVisibility: .visible
+                        ) {
+                            Button("Delete", role: .destructive) {
+                                Task { await deleteObject() }
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text(downloadState == .notDownloaded
+                                ? "This permanently deletes the file from \(destination.bucket)."
+                                : "This permanently deletes the file from \(destination.bucket). Its downloaded copy on this device is removed too.")
+                        }
                     }
                 }
                 .padding(.horizontal)
