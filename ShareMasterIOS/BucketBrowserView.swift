@@ -35,6 +35,7 @@ struct BucketBrowserView: View {
     @State private var showNewDestinationPrompt = false
     @State private var newDestinationName = ""
     @State private var didSaveDestination = false
+    @State private var editingDestination: Destination?
 
     private var config: S3Config? {
         ConfigStore.shared.s3Config(for: destination)
@@ -119,14 +120,22 @@ struct BucketBrowserView: View {
                     Task { await refresh() }
                 }
                 Menu {
-                    Button {
-                        let existing = ConfigStore.shared.destinations.map(\.name)
-                        newDestinationName = existing.contains(suggestedDestinationName)
-                            ? ConfigStore.copyName(suggestedDestinationName, existing: existing)
-                            : suggestedDestinationName
-                        showNewDestinationPrompt = true
-                    } label: {
-                        Label("New Destination Here", systemImage: "externaldrive.badge.plus")
+                    if let existing = destinationAtThisPrefix {
+                        Button {
+                            editingDestination = existing
+                        } label: {
+                            Label("View Destination Settings", systemImage: "slider.horizontal.3")
+                        }
+                    } else {
+                        Button {
+                            let names = ConfigStore.shared.destinations.map(\.name)
+                            newDestinationName = names.contains(suggestedDestinationName)
+                                ? ConfigStore.copyName(suggestedDestinationName, existing: names)
+                                : suggestedDestinationName
+                            showNewDestinationPrompt = true
+                        } label: {
+                            Label("New Destination Here", systemImage: "externaldrive.badge.plus")
+                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -147,6 +156,9 @@ struct BucketBrowserView: View {
         }
         .task { await refresh() }
         .refreshable { await refresh() }
+        .sheet(item: $editingDestination) { dest in
+            DestinationEditorView(destination: dest)
+        }
         .sheet(item: $selectedObject) { object in
             ObjectDetailView(object: object, destination: destination) {
                 objects.removeAll { $0.key == object.key }
@@ -230,6 +242,18 @@ struct BucketBrowserView: View {
                     Task { await loadMore() }
                 }
             }
+        }
+    }
+
+    /// An existing destination already rooted at the folder being viewed
+    /// (same account + bucket + prefix). When one exists the "…" menu offers
+    /// its settings instead of creating a duplicate. Stored prefixes are
+    /// normalized on save, so a direct compare against listPrefix works.
+    private var destinationAtThisPrefix: Destination? {
+        ConfigStore.shared.destinations.first {
+            $0.accountId == destination.accountId
+                && $0.bucket == destination.bucket
+                && $0.pathPrefix == listPrefix
         }
     }
 
