@@ -33,6 +33,8 @@ The toolbar "+" uploads **into the folder currently open**: the browser passes i
 
 **Deleting asks first** — swipe, context menu, and the detail sheet all funnel into a `confirmationDialog` naming the file and the bucket; when a downloaded copy exists the message says it's removed too (both the remote object and the local copy go together).
 
+**Anchoring rule:** every `confirmationDialog` must be attached to the view it's about — the list row being deleted, the Delete button in the detail sheet, the Remove All Downloads button in Settings — never to the List or screen container. iOS 26 presents these dialogs as popovers anchored to the attached view, so a screen-level dialog draws at an arbitrary position pointing at an unrelated row.
+
 ### The "…" menu: sorting and destinations from folders
 
 Next to the "+" there's a context-aware "…" menu, present at every browser level (including levels above the destination root reached via the up row):
