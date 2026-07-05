@@ -12,7 +12,18 @@ actor S3Service {
 
     struct S3Error: Error, LocalizedError {
         let message: String
+        /// The S3 error <Code> when the failure came from an S3 response
+        /// (e.g. "AccessDenied"), nil for local/transport errors.
+        var code: String? = nil
         var errorDescription: String? { message }
+
+        /// True when the failure is about credentials or access policy,
+        /// as opposed to a missing bucket/key or a network problem.
+        var isPermissionIssue: Bool {
+            guard let code else { return false }
+            return ["AccessDenied", "AllAccessDisabled", "AccountProblem",
+                    "InvalidAccessKeyId", "SignatureDoesNotMatch"].contains(code)
+        }
     }
 
     /// Builds a user-facing error from an S3 error response, translating the
@@ -41,7 +52,11 @@ actor S3Service {
                 detail = "HTTP \(status)"
             }
         }
-        return S3Error(message: "\(operation) failed: \(detail)")
+        // A 403 with an unparseable body is still a permission problem.
+        return S3Error(
+            message: "\(operation) failed: \(detail)",
+            code: code ?? (status == 403 ? "AccessDenied" : nil)
+        )
     }
 
     private static func xmlValue(_ tag: String, in xml: String) -> String? {

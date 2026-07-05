@@ -29,6 +29,7 @@ struct BucketBrowserView: View {
     @State private var isLoading = false
     @State private var isLoadingMore = false
     @State private var errorMessage: String?
+    @State private var isPermissionError = false
     @State private var selectedObject: S3Object?
     @State private var copiedKey: String?
 
@@ -75,12 +76,27 @@ struct BucketBrowserView: View {
                 ProgressView("Loading…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let errorMessage, isEmpty {
-                ContentUnavailableView {
-                    Label("Couldn't Load", systemImage: "exclamationmark.icloud")
-                } description: {
-                    Text(errorMessage)
-                } actions: {
-                    Button("Retry") { Task { await refresh() } }
+                if isPermissionError {
+                    ContentUnavailableView {
+                        Label {
+                            Text("Permission Denied")
+                        } icon: {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.yellow)
+                        }
+                    } description: {
+                        Text("This account isn't allowed to list this location. Check the account's credentials and that its IAM or bucket policy grants s3:ListBucket here.\n\n\(errorMessage)")
+                    } actions: {
+                        Button("Retry") { Task { await refresh() } }
+                    }
+                } else {
+                    ContentUnavailableView {
+                        Label("Couldn't Load", systemImage: "exclamationmark.icloud")
+                    } description: {
+                        Text(errorMessage)
+                    } actions: {
+                        Button("Retry") { Task { await refresh() } }
+                    }
                 }
             } else if isEmpty && parentPrefix == nil {
                 ContentUnavailableView(
@@ -204,8 +220,10 @@ struct BucketBrowserView: View {
             objects = page.objects
             nextToken = page.nextContinuationToken
             errorMessage = nil
+            isPermissionError = false
         } catch {
             errorMessage = error.localizedDescription
+            isPermissionError = (error as? S3Service.S3Error)?.isPermissionIssue ?? false
         }
     }
 
