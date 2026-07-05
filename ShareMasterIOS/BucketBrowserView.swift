@@ -32,6 +32,9 @@ struct BucketBrowserView: View {
     @State private var isPermissionError = false
     @State private var selectedObject: S3Object?
     @State private var copiedKey: String?
+    @State private var showNewDestinationPrompt = false
+    @State private var newDestinationName = ""
+    @State private var didSaveDestination = false
 
     private var config: S3Config? {
         ConfigStore.shared.s3Config(for: destination)
@@ -111,11 +114,36 @@ struct BucketBrowserView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
                 UploadMenu(destination: destination, keyPrefix: listPrefix) {
                     Task { await refresh() }
                 }
+                Menu {
+                    Button {
+                        let existing = ConfigStore.shared.destinations.map(\.name)
+                        newDestinationName = existing.contains(suggestedDestinationName)
+                            ? ConfigStore.copyName(suggestedDestinationName, existing: existing)
+                            : suggestedDestinationName
+                        showNewDestinationPrompt = true
+                    } label: {
+                        Label("New Destination Here", systemImage: "externaldrive.badge.plus")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
             }
+        }
+        .alert("New Destination", isPresented: $showNewDestinationPrompt) {
+            TextField("Destination name", text: $newDestinationName)
+            Button("Create") { createDestinationHere() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Creates a destination with this account and bucket, rooted at \(listPrefix.isEmpty ? "the bucket root" : "\u{201C}\(listPrefix)\u{201D}").")
+        }
+        .alert("Destination Created", isPresented: $didSaveDestination) {
+            Button("OK") {}
+        } message: {
+            Text("\u{201C}\(newDestinationName)\u{201D} was added to your destinations.")
         }
         .task { await refresh() }
         .refreshable { await refresh() }
@@ -203,6 +231,25 @@ struct BucketBrowserView: View {
                 }
             }
         }
+    }
+
+    /// Default name for a destination created from this folder: the folder's
+    /// own name, falling back to the source destination's display title at
+    /// the root.
+    private var suggestedDestinationName: String {
+        title
+    }
+
+    /// Saves a copy of this destination rooted at the folder being viewed.
+    /// Same account, bucket and options — only the name and path change.
+    private func createDestinationHere() {
+        var copy = destination
+        copy.id = UUID()
+        copy.name = newDestinationName.trimmingCharacters(in: .whitespaces)
+        copy.pathPrefix = listPrefix
+        copy.sortOrder = 0  // upsert appends it after the existing ones
+        ConfigStore.shared.upsertDestination(copy)
+        didSaveDestination = true
     }
 
     private func refresh() async {
