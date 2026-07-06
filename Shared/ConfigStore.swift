@@ -151,6 +151,14 @@ enum RecentScope: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// macOS popover only: whether the expandable section browses the selected
+/// destination's folders or shows the flat cross-destination recent list.
+enum BrowserPaneMode: String, Codable, CaseIterable, Identifiable {
+    case browse       // folder navigation within the selected destination
+    case recentAll    // flat, newest-first, merged across all destinations
+    var id: String { rawValue }
+}
+
 enum DownloadLocation: String, Codable {
     case downloads   // the user's Downloads folder
     case custom      // the folder in downloadDirBookmark
@@ -225,6 +233,10 @@ final class ConfigStore {
         static let tapForCellularPreviews = "config_tap_for_cellular_previews"
         static let iCloudSync = "config_icloud_sync_enabled"
         static let downloadsInFilesApp = "config_downloads_in_files_app"
+        // macOS popover presentation — local only, never synced to iOS.
+        static let browserPaneMode = "config_browser_pane_mode"
+        static let browserDefaultExpanded = "config_browser_default_expanded"
+        static let browseLocations = "config_browse_locations"
     }
 
     private(set) var accounts: [Account] = [] {
@@ -259,6 +271,38 @@ final class ConfigStore {
     /// Collapsed (default) skips listing entirely until the user opens it.
     var recentsExpanded: Bool = false {
         didSet { defaults.set(recentsExpanded, forKey: Keys.recentsExpanded) }
+    }
+
+    /// macOS popover only. Whether the expandable section browses folders or
+    /// shows the flat cross-destination recent list. Remembered across opens.
+    var browserPaneMode: BrowserPaneMode = .browse {
+        didSet { defaults.set(browserPaneMode.rawValue, forKey: Keys.browserPaneMode) }
+    }
+
+    /// macOS-only preference (not synced): the state the section opens in on a
+    /// fresh install. After the first open, `recentsExpanded` remembers the
+    /// user's last choice, so this only seeds the very first launch.
+    var browserDefaultExpanded: Bool = false {
+        didSet { defaults.set(browserDefaultExpanded, forKey: Keys.browserDefaultExpanded) }
+    }
+
+    /// macOS-only (not synced): the folder the browser was last showing per
+    /// destination, so reopening the popover returns to where you left off.
+    /// Keyed by destination UUID string → full key prefix.
+    private var browseLocations: [String: String] = [:] {
+        didSet { persist(browseLocations, key: Keys.browseLocations) }
+    }
+
+    func browseLocation(for destinationID: UUID) -> String? {
+        browseLocations[destinationID.uuidString]
+    }
+
+    func setBrowseLocation(_ prefix: String?, for destinationID: UUID) {
+        if let prefix {
+            browseLocations[destinationID.uuidString] = prefix
+        } else {
+            browseLocations[destinationID.uuidString] = nil
+        }
     }
 
     /// Remembered across popover teardowns (the content view is released a
@@ -330,7 +374,17 @@ final class ConfigStore {
         pinPopover = defaults.bool(forKey: Keys.pinPopover)
         let storedLimit = defaults.integer(forKey: Keys.recentLimit)
         if storedLimit > 0 { recentLimit = storedLimit }
-        recentsExpanded = defaults.bool(forKey: Keys.recentsExpanded)
+        browserDefaultExpanded = defaults.bool(forKey: Keys.browserDefaultExpanded)
+        // Seed the expanded state from the preference on first launch; after
+        // that the last state is remembered.
+        recentsExpanded = defaults.object(forKey: Keys.recentsExpanded) != nil
+            ? defaults.bool(forKey: Keys.recentsExpanded)
+            : browserDefaultExpanded
+        if let raw = defaults.string(forKey: Keys.browserPaneMode),
+           let mode = BrowserPaneMode(rawValue: raw) {
+            browserPaneMode = mode
+        }
+        browseLocations = load([String: String].self, key: Keys.browseLocations) ?? [:]
         if let raw = defaults.string(forKey: Keys.lastSelectedDestination) {
             lastSelectedDestinationID = UUID(uuidString: raw)
         }

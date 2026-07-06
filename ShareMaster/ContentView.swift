@@ -55,6 +55,16 @@ struct ContentView: View {
     @State private var recentItems: [RecentItem] = []
     @State private var isLoadingList = false
 
+    // Browser state (Browse mode) — folder navigation within the selected
+    // destination. browsePrefix is the full key prefix currently shown.
+    @State private var browsePrefix: String = ""
+    @State private var browseFolders: [S3Folder] = []
+    @State private var browseItems: [RecentItem] = []
+    @State private var browseSortOverride: BrowserSort?
+    @State private var newFolderName = ""
+    @State private var showNewFolderPrompt = false
+    @State private var newFolderError: String?
+
     // Download/Preview state
     @State private var downloadingObjectKey: String?
     @State private var downloadProgress: Double = 0
@@ -96,7 +106,8 @@ struct ContentView: View {
                 let remembered = config.lastSelectedDestinationID
                 selectedDestinationID = destinations.first { $0.id == remembered }?.id ?? destinations.first?.id
             }
-            if config.recentsExpanded { await loadRecent() }
+            restoreBrowseLocation()
+            await reloadExpanded()
         }
         .task {
             // The keychain posts no change notifications, so poll the cloud
@@ -109,31 +120,62 @@ struct ContentView: View {
             }
         }
         .onChange(of: config.recentsExpanded) { _, expanded in
-            if expanded { Task { await loadRecent() } }
+            if expanded { Task { await reloadExpanded() } }
+        }
+        .onChange(of: config.browserPaneMode) { _, _ in
+            Task { await reloadExpanded() }
         }
         .onChange(of: selectedDestinationID) { _, newValue in
             if let newValue { config.lastSelectedDestinationID = newValue }
-            if config.recentsExpanded && config.recentScope == .perDestination {
-                Task { await loadRecent() }
-            }
+            // A new destination has its own folder tree and default sort.
+            browseSortOverride = nil
+            restoreBrowseLocation()
+            Task { await reloadExpanded() }
         }
-        .onChange(of: config.recentScope) { _, _ in
-            if config.recentsExpanded { Task { await loadRecent() } }
+        .onChange(of: browsePrefix) { _, newValue in
+            if let id = selectedDestinationID { config.setBrowseLocation(newValue, for: id) }
+        }
+        .onChange(of: browseSortOverride) { _, _ in
+            if config.recentsExpanded && config.browserPaneMode == .browse {
+                Task { await loadBrowse() }
+            }
         }
         .onChange(of: config.destinations) { _, _ in
             // Editing a destination (public URL base, link mode, expiry, bucket…)
-            // invalidates the resolved links in the recent list, so reload it.
-            if config.recentsExpanded { Task { await loadRecent() } }
+            // invalidates the resolved links, so reload the visible section.
+            if config.recentsExpanded { Task { await reloadExpanded() } }
         }
         .onReceive(NotificationCenter.default.publisher(for: .statusItemDidReceiveDrop)) { note in
-            // Files dropped directly on the menu bar icon go to the current destination.
+            // Files dropped directly on the menu bar icon go to the current
+            // destination, into the folder currently open in the browser.
             guard !isUploading,
                   let urls = note.userInfo?["urls"] as? [URL],
                   let destination = selectedDestination else { return }
             Task { @MainActor in
-                await uploadFiles(urls, to: destination)
+                await uploadFiles(urls, to: destination, keyPrefix: uploadKeyPrefix)
             }
         }
+        .alert("New Folder", isPresented: $showNewFolderPrompt) {
+            TextField("Folder name", text: $newFolderName)
+            Button("Create") { createFolder() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Creates a folder in the current directory.")
+        }
+        .alert("Couldn't Create Folder", isPresented: Binding(
+            get: { newFolderError != nil },
+            set: { if !$0 { newFolderError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(newFolderError ?? "")
+        }
+    }
+
+    /// The key prefix uploads and drops target: the folder currently open in
+    /// Browse mode, or nil (the destination's configured root) in Recent (All).
+    private var uploadKeyPrefix: String? {
+        config.browserPaneMode == .browse ? browsePrefix : nil
     }
 
     // MARK: - Header
@@ -270,12 +312,12 @@ struct ContentView: View {
                     uploadTasks: uploadTasks
                 )
                 .onTapGesture {
-                    if !isUploading { openFilePicker(destination) }
+                    if !isUploading { openFilePicker(destination, keyPrefix: uploadKeyPrefix) }
                 }
                 .onDrop(of: [.fileURL, .image], isTargeted: $isTargeted) { providers in
                     guard !isUploading else { return false }
                     NSApp.activate(ignoringOtherApps: true)
-                    handleDrop(providers, to: destination)
+                    handleDrop(providers, to: destination, keyPrefix: uploadKeyPrefix)
                     return true
                 }
                 .padding(16)
@@ -300,100 +342,291 @@ struct ContentView: View {
                     .padding(.bottom, 8)
                 }
 
-                recentList
+                expandableSection
 
                 // Pin everything above to the top so collapsing/expanding the
-                // recents section never shifts the header or drop zone.
+                // section never shifts the header or drop zone.
                 Spacer(minLength: 0)
             }
         }
     }
 
-    private var recentList: some View {
+    // MARK: - Expandable section (Browse / Recent All)
+
+    private var isBrowse: Bool { config.browserPaneMode == .browse }
+
+    private var expandableSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                // Collapsible: recents only load (and list requests only fire)
-                // while this section is expanded.
-                Button {
-                    config.recentsExpanded.toggle()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .rotationEffect(.degrees(config.recentsExpanded ? 90 : 0))
-                            .animation(.easeInOut(duration: 0.15), value: config.recentsExpanded)
-                        Text(config.recentScope == .combined ? "Recent Uploads (All)" : "Recent Uploads")
-                            .font(.subheadline)
-                    }
-                    .foregroundStyle(.secondary)
+            sectionHeader
+            if config.recentsExpanded {
+                if isBrowse {
+                    browserContent
+                } else {
+                    recentAllContent
                 }
-                .buttonStyle(.borderless)
-                Spacer()
-                if config.recentsExpanded {
-                    if isLoadingList {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Button {
-                            Task { await loadRecent() }
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
+            }
+        }
+    }
+
+    private var sectionTitle: String {
+        if !isBrowse { return "Recent Uploads (All)" }
+        guard let destination = selectedDestination else { return "Browse" }
+        return destination.name.isEmpty ? destination.bucket : destination.name
+    }
+
+    private var sectionHeader: some View {
+        HStack(spacing: 8) {
+            // Collapsible: content only loads (and list requests only fire)
+            // while this section is expanded.
+            Button {
+                config.recentsExpanded.toggle()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .rotationEffect(.degrees(config.recentsExpanded ? 90 : 0))
+                        .animation(.easeInOut(duration: 0.15), value: config.recentsExpanded)
+                    Text(sectionTitle)
+                        .font(.subheadline)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+
+            Spacer(minLength: 4)
+
+            if config.recentsExpanded {
+                // Back one folder level (Browse mode, below the root only).
+                if isBrowse && canGoBack {
+                    Button {
+                        browseBack()
+                    } label: {
+                        Image(systemName: "chevron.backward")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Back")
+                }
+
+                sortMenu
+                if isBrowse { browseActionsMenu }
+                modeToggle
+
+                if isLoadingList {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Button {
+                        Task { await reloadExpanded() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Refresh")
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+
+    /// Browse ↔ Recent (All) switch.
+    private var modeToggle: some View {
+        Menu {
+            Picker("View", selection: Binding(
+                get: { config.browserPaneMode },
+                set: { config.browserPaneMode = $0 }
+            )) {
+                Label("Browse Folders", systemImage: "folder").tag(BrowserPaneMode.browse)
+                Label("Recent (All)", systemImage: "clock").tag(BrowserPaneMode.recentAll)
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Image(systemName: isBrowse ? "folder" : "clock")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Switch between folder browsing and recent uploads")
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort By", selection: Binding(
+                get: { browseSort },
+                set: { browseSortOverride = $0 }
+            )) {
+                ForEach(BrowserSort.allCases) { option in
+                    Text(option.label).tag(option)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Sort")
+    }
+
+    /// "…" menu: new folder here, plus the destination-here / settings actions.
+    private var browseActionsMenu: some View {
+        Menu {
+            Button {
+                newFolderName = ""
+                showNewFolderPrompt = true
+            } label: {
+                Label("New Folder", systemImage: "folder.badge.plus")
+            }
+            Divider()
+            if let existing = destinationAtCurrentPrefix {
+                Button {
+                    config.pendingDuplicate = existing   // opens editor pre-filled
+                    openSettings()
+                    openNativeSettings()
+                } label: {
+                    Label("View Destination Settings", systemImage: "slider.horizontal.3")
+                }
+            } else {
+                Button {
+                    createDestinationHere()
+                } label: {
+                    Label("New Destination Here", systemImage: "externaldrive.badge.plus")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+    }
+
+    // MARK: Browse content
+
+    @ViewBuilder
+    private var browserContent: some View {
+        // Only once drilled below the root — the section title already names
+        // the destination at the top level.
+        if browsePrefix != rootPrefix {
+            breadcrumbBar
+        }
+        if browseFolders.isEmpty && browseItems.isEmpty && !isLoadingList {
+            VStack {
+                Text(browsePrefix == rootPrefix ? "No files yet" : "Empty folder")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            List {
+                ForEach(browseFolders) { folder in
+                    MacFolderRow(name: folderDisplayName(folder))
+                        .contentShape(Rectangle())
+                        .onTapGesture { drillInto(folder) }
+                        .listRowInsets(EdgeInsets(top: 0, leading: 6, bottom: 0, trailing: 6))
+                }
+                ForEach(browseItems) { item in
+                    fileRow(for: item, badge: nil)
+                        .id(item.object.id)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 6, bottom: 0, trailing: 6))
+                }
+            }
+            .listStyle(.plain)
+            .scrollIndicators(.never)
+            // Best-effort swipe-left to go back a level. Simultaneous so it
+            // doesn't fight the list's vertical scrolling.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 30)
+                    .onEnded { value in
+                        if abs(value.translation.width) > abs(value.translation.height) * 1.5,
+                           value.translation.width < -60, canGoBack {
+                            browseBack()
                         }
-                        .buttonStyle(.borderless)
+                    }
+            )
+        }
+    }
+
+    private var breadcrumbBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 4) {
+                ForEach(breadcrumbs) { crumb in
+                    Button {
+                        if crumb.prefix != browsePrefix { browsePrefix = crumb.prefix; Task { await loadBrowse() } }
+                    } label: {
+                        Text(crumb.label)
+                            .font(.caption)
+                            .foregroundStyle(crumb.prefix == browsePrefix ? Color.primary : Color.accentColor)
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.borderless)
+                    if crumb.prefix != breadcrumbs.last?.prefix {
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
                     }
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.bottom, 4)
+        }
+    }
 
-            if !config.recentsExpanded {
-                EmptyView()
-            } else if recentItems.isEmpty && !isLoadingList {
-                VStack {
-                    Text("No files yet")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollViewReader { proxy in
-                    List {
-                        ForEach(recentItems) { item in
-                            FileRowView(
-                                object: item.object,
-                                previewURL: previewURL(for: item),
-                                badge: config.recentScope == .combined ? item.destination.name : nil,
-                                isDownloading: downloadingObjectKey == item.object.key,
-                                downloadProgress: downloadingObjectKey == item.object.key ? downloadProgress : 0
-                            ) {
-                                copyToClipboard(item)
-                            } onDelete: {
-                                await deleteObject(item)
-                            } onDownload: { choosePanel in
-                                await downloadToDownloads(item, forcePanel: choosePanel)
-                            } onPreview: {
-                                previewFile(item)
-                            }
+    // MARK: Recent (All) content
+
+    @ViewBuilder
+    private var recentAllContent: some View {
+        if recentItems.isEmpty && !isLoadingList {
+            VStack {
+                Text("No files yet")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ScrollViewReader { proxy in
+                List {
+                    ForEach(recentItems) { item in
+                        fileRow(for: item, badge: item.destination.name)
                             .id(item.object.id)
                             .listRowInsets(EdgeInsets(top: 0, leading: 6, bottom: 0, trailing: 6))
-                        }
                     }
-                    .listStyle(.plain)
-                    .scrollIndicators(.never)
-                    .onChange(of: recentItems.first?.id) { _, newValue in
-                        guard let newValue else { return }
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            proxy.scrollTo(newValue, anchor: .top)
-                        }
+                }
+                .listStyle(.plain)
+                .scrollIndicators(.never)
+                .onChange(of: recentItems.first?.id) { _, newValue in
+                    guard let newValue else { return }
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        proxy.scrollTo(newValue, anchor: .top)
                     }
                 }
             }
         }
     }
 
+    private func fileRow(for item: RecentItem, badge: String?) -> some View {
+        FileRowView(
+            object: item.object,
+            previewURL: previewURL(for: item),
+            badge: badge,
+            isDownloading: downloadingObjectKey == item.object.key,
+            downloadProgress: downloadingObjectKey == item.object.key ? downloadProgress : 0
+        ) {
+            copyToClipboard(item)
+        } onDelete: {
+            await deleteObject(item)
+        } onDownload: { choosePanel in
+            await downloadToDownloads(item, forcePanel: choosePanel)
+        } onPreview: {
+            previewFile(item)
+        }
+    }
+
     // MARK: - Drop handling
 
-    private func handleDrop(_ providers: [NSItemProvider], to destination: Destination) {
+    private func handleDrop(_ providers: [NSItemProvider], to destination: Destination, keyPrefix: String? = nil) {
         let lock = NSLock()
         var collectedURLs: [URL] = []
         let group = DispatchGroup()
@@ -415,7 +648,7 @@ struct ContentView: View {
                     self.errorMessage = "No files found in drop."
                     return
                 }
-                await self.uploadFiles(collectedURLs, to: destination)
+                await self.uploadFiles(collectedURLs, to: destination, keyPrefix: keyPrefix)
             }
         }
     }
@@ -497,7 +730,7 @@ struct ContentView: View {
         }
     }
 
-    private func openFilePicker(_ destination: Destination) {
+    private func openFilePicker(_ destination: Destination, keyPrefix: String? = nil) {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
@@ -507,20 +740,20 @@ struct ContentView: View {
             panel.beginSheetModal(for: window) { response in
                 guard response == .OK else { return }
                 Task { @MainActor in
-                    await uploadFiles(panel.urls, to: destination)
+                    await uploadFiles(panel.urls, to: destination, keyPrefix: keyPrefix)
                 }
             }
         } else {
             let response = panel.runModal()
             guard response == .OK else { return }
             Task { @MainActor in
-                await uploadFiles(panel.urls, to: destination)
+                await uploadFiles(panel.urls, to: destination, keyPrefix: keyPrefix)
             }
         }
     }
 
     @MainActor
-    private func uploadFiles(_ urls: [URL], to destination: Destination) async {
+    private func uploadFiles(_ urls: [URL], to destination: Destination, keyPrefix: String? = nil) async {
         guard !urls.isEmpty else { return }
         guard let cfg = config.s3Config(for: destination) else {
             errorMessage = "This destination has no valid account."
@@ -545,7 +778,7 @@ struct ContentView: View {
                     }
                 }
 
-                let result = try await S3Service.shared.upload(fileURL: fileURL, config: cfg) { progress in
+                let result = try await S3Service.shared.upload(fileURL: fileURL, config: cfg, keyPrefix: keyPrefix) { progress in
                     Task { @MainActor in
                         if index < self.uploadTasks.count {
                             self.uploadTasks[index].progress = progress
@@ -567,15 +800,22 @@ struct ContentView: View {
                 uploadTasks[index].resultURL = result.url
                 uploadedURLs.append(result.url)
 
-                // Optimistically add to the list when it belongs to the current view.
-                // Skip while collapsed — the list reloads fresh on next expand.
-                let visible = config.recentsExpanded &&
-                    (config.recentScope == .combined || destination.id == selectedDestination?.id)
-                if visible {
+                // Optimistically add to the visible list. Skip while collapsed
+                // — the list reloads fresh on next expand.
+                if config.recentsExpanded {
                     let newObject = S3Object(key: result.key, size: fileSize, lastModified: Date())
-                    recentItems.insert(RecentItem(object: newObject, destination: destination, link: result.url), at: 0)
-                    if recentItems.count > config.recentLimit {
-                        recentItems.removeLast(recentItems.count - config.recentLimit)
+                    let item = RecentItem(object: newObject, destination: destination, link: result.url)
+                    if isBrowse {
+                        // Only when it landed in the folder currently shown for
+                        // the selected destination.
+                        if destination.id == selectedDestination?.id, (keyPrefix ?? cfg.pathPrefix) == browsePrefix {
+                            browseItems.insert(item, at: 0)
+                        }
+                    } else {
+                        recentItems.insert(item, at: 0)
+                        if recentItems.count > config.recentLimit {
+                            recentItems.removeLast(recentItems.count - config.recentLimit)
+                        }
                     }
                 }
 
@@ -609,47 +849,214 @@ struct ContentView: View {
 
     // MARK: - Loading
 
-    private func loadRecent() async {
+    /// Loads whichever mode is showing, if the section is expanded.
+    private func reloadExpanded() async {
+        guard config.recentsExpanded else { return }
+        if isBrowse {
+            await loadBrowse()
+        } else {
+            await loadRecentAll()
+        }
+    }
+
+    /// Recent (All): newest-first, merged across every visible destination.
+    private func loadRecentAll() async {
         guard !destinations.isEmpty else { recentItems = []; return }
         isLoadingList = true
         defer { isLoadingList = false }
 
-        switch config.recentScope {
-        case .perDestination:
-            guard let destination = selectedDestination,
-                  let cfg = config.s3Config(for: destination) else {
-                recentItems = []
-                return
-            }
-            do {
-                let objects = try await S3Service.shared.listObjects(config: cfg)
-                let limited = Array(objects.prefix(config.recentLimit))
-                recentItems = await resolveItems(limited, destination: destination, config: cfg)
-            } catch {
-                errorMessage = error.localizedDescription
-                recentItems = []
-            }
-        case .combined:
-            let targets = destinations.compactMap { dest -> (Destination, S3Config)? in
-                guard let cfg = config.s3Config(for: dest) else { return nil }
-                return (dest, cfg)
-            }
-            var merged: [RecentItem] = []
-            await withTaskGroup(of: [RecentItem].self) { group in
-                for (dest, cfg) in targets {
-                    group.addTask { [limit = config.recentLimit] in
-                        guard let objects = try? await S3Service.shared.listObjects(config: cfg) else { return [] }
-                        let limited = Array(objects.prefix(limit))
-                        return await self.resolveItems(limited, destination: dest, config: cfg)
-                    }
-                }
-                for await items in group { merged.append(contentsOf: items) }
-            }
-            recentItems = Array(
-                merged.sorted { $0.object.lastModified > $1.object.lastModified }
-                    .prefix(config.recentLimit)
-            )
+        let targets = destinations.compactMap { dest -> (Destination, S3Config)? in
+            guard let cfg = config.s3Config(for: dest) else { return nil }
+            return (dest, cfg)
         }
+        var merged: [RecentItem] = []
+        await withTaskGroup(of: [RecentItem].self) { group in
+            for (dest, cfg) in targets {
+                group.addTask { [limit = config.recentLimit] in
+                    guard let objects = try? await S3Service.shared.listObjects(config: cfg) else { return [] }
+                    let limited = Array(objects.prefix(limit))
+                    return await self.resolveItems(limited, destination: dest, config: cfg)
+                }
+            }
+            for await items in group { merged.append(contentsOf: items) }
+        }
+        recentItems = Array(
+            merged.sorted { $0.object.lastModified > $1.object.lastModified }
+                .prefix(config.recentLimit)
+        )
+    }
+
+    // MARK: - Browse
+
+    /// The selected destination's configured root prefix — the top of the
+    /// browse tree. Back-navigation never climbs above this.
+    private var rootPrefix: String {
+        config.s3Config(for: selectedDestination ?? destinations.first ?? Destination(accountId: UUID()))?.pathPrefix ?? ""
+    }
+
+    /// Effective sort: the per-view override, else the destination's default.
+    private var browseSort: BrowserSort {
+        browseSortOverride ?? selectedDestination?.defaultBrowserSort ?? .recentFirst
+    }
+
+    private var canGoBack: Bool {
+        browsePrefix != rootPrefix && browsePrefix.count > rootPrefix.count
+    }
+
+    /// Restores the last-viewed folder for the selected destination, clamped
+    /// to at or below its root (a stored prefix from a since-changed path is
+    /// dropped back to the root).
+    private func restoreBrowseLocation() {
+        let root = rootPrefix
+        if let id = selectedDestinationID,
+           let saved = config.browseLocation(for: id),
+           saved.hasPrefix(root) {
+            browsePrefix = saved
+        } else {
+            browsePrefix = root
+        }
+    }
+
+    private func folderDisplayName(_ folder: S3Folder) -> String {
+        let trimmed = folder.prefix.hasSuffix("/") ? String(folder.prefix.dropLast()) : folder.prefix
+        return (trimmed as NSString).lastPathComponent
+    }
+
+    private func drillInto(_ folder: S3Folder) {
+        browsePrefix = folder.prefix
+        Task { await loadBrowse() }
+    }
+
+    private func browseBack() {
+        guard canGoBack else { return }
+        let trimmed = browsePrefix.hasSuffix("/") ? String(browsePrefix.dropLast()) : browsePrefix
+        var parent = (trimmed as NSString).deletingLastPathComponent
+        if !parent.isEmpty { parent += "/" }
+        // Never climb above the destination's own root.
+        browsePrefix = parent.count < rootPrefix.count ? rootPrefix : parent
+        Task { await loadBrowse() }
+    }
+
+    struct Breadcrumb: Identifiable {
+        let label: String
+        let prefix: String
+        var id: String { prefix }
+    }
+
+    /// Root crumb (destination name) plus one per folder level below it.
+    private var breadcrumbs: [Breadcrumb] {
+        let root = rootPrefix
+        let rootLabel = selectedDestination.map { $0.name.isEmpty ? $0.bucket : $0.name } ?? "Root"
+        var crumbs = [Breadcrumb(label: rootLabel, prefix: root)]
+        guard browsePrefix.hasPrefix(root), browsePrefix.count > root.count else { return crumbs }
+        let remainder = String(browsePrefix.dropFirst(root.count))
+        let parts = remainder.split(separator: "/", omittingEmptySubsequences: true)
+        var acc = root
+        for part in parts {
+            acc += part + "/"
+            crumbs.append(Breadcrumb(label: String(part), prefix: acc))
+        }
+        return crumbs
+    }
+
+    private func loadBrowse() async {
+        guard let destination = selectedDestination,
+              let cfg = config.s3Config(for: destination) else {
+            browseFolders = []; browseItems = []; return
+        }
+        isLoadingList = true
+        defer { isLoadingList = false }
+        let sort = browseSort
+        do {
+            // Fetch the level (bounded so a huge folder can't spin forever),
+            // then order client-side. Folder markers are hidden by the service.
+            var allFolders: [S3Folder] = []
+            var allObjects: [S3Object] = []
+            var token: String?
+            for _ in 0..<25 {
+                let page = try await S3Service.shared.listDirectory(
+                    config: cfg, prefix: browsePrefix,
+                    continuationToken: token, pageSize: 100
+                )
+                allFolders.append(contentsOf: page.folders)
+                allObjects.append(contentsOf: page.objects)
+                token = page.nextContinuationToken
+                if token == nil { break }
+            }
+            let (folders, objects) = Self.sortedBrowse(folders: allFolders, objects: allObjects, by: sort)
+            browseFolders = folders
+            browseItems = await resolveItems(objects, destination: destination, config: cfg)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+            browseFolders = []; browseItems = []
+        }
+    }
+
+    private static func sortedBrowse(
+        folders: [S3Folder], objects: [S3Object], by sort: BrowserSort
+    ) -> ([S3Folder], [S3Object]) {
+        switch sort {
+        case .nameAscending:
+            return (folders, objects)   // S3 already lists ascending
+        case .nameDescending:
+            return (
+                folders.sorted { folderName($0).localizedStandardCompare(folderName($1)) == .orderedDescending },
+                objects.sorted { $0.filename.localizedStandardCompare($1.filename) == .orderedDescending }
+            )
+        case .recentFirst:
+            // Folders carry no date, so leave them in name order at the top.
+            return (folders, objects.sorted { $0.lastModified > $1.lastModified })
+        }
+    }
+
+    private static func folderName(_ folder: S3Folder) -> String {
+        let trimmed = folder.prefix.hasSuffix("/") ? String(folder.prefix.dropLast()) : folder.prefix
+        return (trimmed as NSString).lastPathComponent
+    }
+
+    // MARK: - Folder / destination actions
+
+    /// An existing destination already rooted at the folder being browsed
+    /// (same account + bucket + prefix), so we offer its settings rather than
+    /// a duplicate.
+    private var destinationAtCurrentPrefix: Destination? {
+        guard let destination = selectedDestination else { return nil }
+        return config.destinations.first {
+            $0.accountId == destination.accountId
+                && $0.bucket == destination.bucket
+                && $0.pathPrefix == browsePrefix
+        }
+    }
+
+    private func createFolder() {
+        guard let destination = selectedDestination,
+              let cfg = config.s3Config(for: destination) else { return }
+        let name = newFolderName
+        Task {
+            do {
+                try await S3Service.shared.createFolder(named: name, under: browsePrefix, config: cfg)
+                await loadBrowse()
+            } catch {
+                newFolderError = error.localizedDescription
+            }
+        }
+    }
+
+    /// Saves a copy of the selected destination rooted at the current folder —
+    /// same account, bucket and options, only the name and path change.
+    private func createDestinationHere() {
+        guard let destination = selectedDestination else { return }
+        var copy = destination
+        copy.id = UUID()
+        let baseName = folderDisplayName(S3Folder(prefix: browsePrefix)).isEmpty
+            ? destination.name
+            : folderDisplayName(S3Folder(prefix: browsePrefix))
+        let names = config.destinations.map(\.name)
+        copy.name = names.contains(baseName) ? ConfigStore.copyName(baseName, existing: names) : baseName
+        copy.pathPrefix = browsePrefix
+        copy.sortOrder = 0
+        config.upsertDestination(copy)
     }
 
     /// Resolves a share link for each object so copy/preview are instant.
@@ -684,6 +1091,7 @@ struct ContentView: View {
         do {
             try await S3Service.shared.deleteObject(key: item.object.key, config: cfg)
             recentItems.removeAll { $0.object.id == item.object.id }
+            browseItems.removeAll { $0.object.id == item.object.id }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -869,6 +1277,37 @@ struct DestinationRow: View {
     private var subtitle: String {
         let path = destination.pathPrefix.isEmpty ? "" : "/\(destination.pathPrefix)"
         return "\(destination.bucket)\(path)"
+    }
+}
+
+// MARK: - Browser folder row
+
+struct MacFolderRow: View {
+    let name: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(nsColor: .separatorColor).opacity(0.3))
+                Image(systemName: "folder")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 32, height: 32)
+
+            Text(name)
+                .font(.system(.subheadline).weight(.medium))
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Spacer(minLength: 8)
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 6)
     }
 }
 

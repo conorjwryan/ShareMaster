@@ -472,6 +472,21 @@ struct DestinationEditor: View {
             }
 
             Section {
+                Picker("Sort files by", selection: Binding(
+                    get: { destination.defaultBrowserSort },
+                    set: { destination.defaultBrowserSort = $0 }
+                )) {
+                    ForEach(BrowserSort.allCases) { option in
+                        Text(option.label).tag(option)
+                    }
+                }
+            } header: {
+                Text("Browsing")
+            } footer: {
+                Text("The default order when browsing this destination's folders in the popover. You can still change the order for a single session from the sort menu. Shared with the iOS app.")
+            }
+
+            Section {
                 Picker("Save downloads to", selection: Binding(
                     get: { destination.effectiveDownloadLocation },
                     set: { newValue in
@@ -602,16 +617,20 @@ struct GeneralSettingsView: View {
             }
 
             Section {
-                Picker("Recent uploads list", selection: Binding(
-                    get: { config.recentScope },
-                    set: { config.recentScope = $0 }
+                Picker("Files section starts", selection: Binding(
+                    get: { config.browserDefaultExpanded },
+                    set: { config.browserDefaultExpanded = $0 }
                 )) {
-                    Text("Per destination").tag(RecentScope.perDestination)
-                    Text("Combined (all destinations)").tag(RecentScope.combined)
+                    Text("Collapsed").tag(false)
+                    Text("Expanded").tag(true)
                 }
                 .pickerStyle(.radioGroup)
+            } footer: {
+                Text("Sets how the files section opens on a fresh install. After that the popover remembers whether you last left it open or closed. This setting stays on this Mac and doesn't sync to your other devices.")
+            }
 
-                Picker("Show at most", selection: Binding(
+            Section {
+                Picker("Recent (All) shows at most", selection: Binding(
                     get: { config.recentLimit },
                     set: { config.recentLimit = $0 }
                 )) {
@@ -620,7 +639,7 @@ struct GeneralSettingsView: View {
                     }
                 }
             } footer: {
-                Text("Per destination shows only the selected destination's files. Combined merges files from every destination with a badge showing where each one lives. The list only loads while expanded, and shows at most the number of files chosen here — keeping list requests down on providers that charge per operation.")
+                Text("The popover's files section can Browse a destination's folders or show Recent (All) — the newest uploads merged from every destination, each badged with where it lives. The list only loads while expanded; Recent (All) shows at most the number chosen here, keeping list requests down on providers that charge per operation.")
             }
         }
         .formStyle(.grouped)
