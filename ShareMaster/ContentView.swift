@@ -143,6 +143,12 @@ struct ContentView: View {
             if expanded { Task { await reloadExpanded() } }
         }
         .onChange(of: config.browserPaneMode) { _, _ in
+            // Switching Browse ↔ Recent shows a different listing — clear and
+            // spin rather than flashing the previous mode's rows.
+            browseFolders = []
+            browseItems = []
+            recentItems = []
+            isLoadingList = true
             Task { await reloadExpanded() }
         }
         .onChange(of: selectedDestinationID) { _, newValue in
@@ -301,8 +307,7 @@ struct ContentView: View {
     /// Navigates the browser to an absolute key prefix (used by breadcrumbs).
     private func navigate(to prefix: String) {
         guard isBrowse, prefix != browsePrefix else { return }
-        browsePrefix = prefix
-        Task { await loadBrowse() }
+        navigateBrowse(to: prefix)
     }
 
     private var notConfiguredView: some View {
@@ -469,6 +474,13 @@ struct ContentView: View {
     private func selectDestination(_ destination: Destination) {
         selectedDestinationID = destination.id
         browseSortOverride = nil
+        // Clear the previous destination's contents and show the spinner right
+        // away rather than lingering on them while the new listing loads.
+        browseFolders = []
+        browseItems = []
+        recentItems = []
+        browseError = nil
+        isLoadingList = true
         let root = rootPrefix(for: destination)
         browsePrefix = root
         config.setBrowseLocation(root, for: destination.id)
@@ -644,7 +656,9 @@ struct ContentView: View {
 
     @ViewBuilder
     private var browseList: some View {
-        if let browseError, browseFolders.isEmpty && browseItems.isEmpty {
+        if isLoadingList && browseFolders.isEmpty && browseItems.isEmpty {
+            loadingState
+        } else if let browseError, browseFolders.isEmpty && browseItems.isEmpty {
             browseErrorView(browseError)
         } else if browseFolders.isEmpty && browseItems.isEmpty && !isLoadingList {
             emptyState(browsePrefix == rootPrefix ? "No files yet" : "Empty folder")
@@ -669,7 +683,9 @@ struct ContentView: View {
 
     @ViewBuilder
     private var recentAllList: some View {
-        if recentItems.isEmpty && !isLoadingList {
+        if isLoadingList && recentItems.isEmpty {
+            loadingState
+        } else if recentItems.isEmpty && !isLoadingList {
             emptyState("No files yet")
         } else {
             ScrollViewReader { proxy in
@@ -700,6 +716,17 @@ struct ContentView: View {
     private func emptyState(_ text: String) -> some View {
         VStack {
             Text(text).font(.callout).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Shown while a destination/folder loads and there's nothing to display yet
+    /// — mirrors the iOS browser so switching location clears to a spinner
+    /// instead of lingering on the previous contents.
+    private var loadingState: some View {
+        VStack(spacing: 10) {
+            ProgressView().controlSize(.small)
+            Text("Loading…").font(.callout).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -1094,8 +1121,7 @@ struct ContentView: View {
     }
 
     private func drillInto(_ folder: S3Folder) {
-        browsePrefix = folder.prefix
-        Task { await loadBrowse() }
+        navigateBrowse(to: folder.prefix)
     }
 
     private func browseBack() {
@@ -1103,7 +1129,18 @@ struct ContentView: View {
         let trimmed = browsePrefix.hasSuffix("/") ? String(browsePrefix.dropLast()) : browsePrefix
         var parent = (trimmed as NSString).deletingLastPathComponent
         if !parent.isEmpty { parent += "/" }
-        browsePrefix = parent   // "" == bucket root
+        navigateBrowse(to: parent)   // "" == bucket root
+    }
+
+    /// Moves the browser to a new folder: clears the current contents and shows
+    /// the loading spinner immediately (rather than lingering on the previous
+    /// folder while the fetch runs), then loads.
+    private func navigateBrowse(to prefix: String) {
+        browseFolders = []
+        browseItems = []
+        browseError = nil
+        isLoadingList = true
+        browsePrefix = prefix
         Task { await loadBrowse() }
     }
 
