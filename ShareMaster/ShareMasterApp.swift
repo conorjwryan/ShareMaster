@@ -107,9 +107,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
-            let icon = NSImage(named: "MenuBarBox") ?? NSImage(systemSymbolName: "archivebox", accessibilityDescription: "ShareMaster")
+            // Swap "MenuBarPlane" ↔ "MenuBarBox" to change the menu-bar glyph.
+            let icon = NSImage(named: "MenuBarPlane") ?? NSImage(systemSymbolName: "paperplane", accessibilityDescription: "ShareMaster")
             icon?.isTemplate = true
-            icon?.size = NSSize(width: 18, height: 18)
+            icon?.size = NSSize(width: 20, height: 20)
             button.image = icon
             button.action = #selector(togglePopover)
             button.target = self
