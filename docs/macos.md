@@ -2,6 +2,18 @@
 
 The macOS target is a menu-bar-only app (`LSUIElement`, no Dock icon). `ShareMaster/ShareMasterApp.swift` owns the `NSStatusItem` + `NSPopover`; `ContentView.swift` is the popover content; `SettingsView.swift` is the native Settings scene.
 
+## Menu bar item
+
+The status-item glyph is a **template image** (`isTemplate`, so the system tints it white/black to match the bar). Four styles ship as template imagesets — `MenuBarPlaneFill` / `MenuBarBoxFill` / `MenuBarPlaneOutline` / `MenuBarBoxOutline` — chosen by `ConfigStore.menuBarIconStyle` (`MenuBarIconStyle` enum, macOS-only pref `config_menu_bar_icon_style`, **not synced**; default `.planeFill`). The **General** settings dropdown writes it; changing it posts `.menuBarIconStyleChanged`, which `applyMenuBarIcon()` observes to swap the image live (no relaunch).
+
+Those PNGs are **generated from the colour logo art** (`LogoBox` / `LogoPlane`): a Swift/CoreGraphics script extracts the dark navy outline (→ *outline* style) or flood-fills the enclosed region with the outline carved back out as negative space (→ *solid* style, like a filled SF Symbol), dilates so the stroke survives the downscale, then **trims the transparent margin** so the glyph fills the frame rather than floating in padding (that padding was why it first looked small). Rendered at 48 px, displayed at 20 pt.
+
+**Selection highlight:** `button.highlight(true)` on open shows the standard rounded selection pill. It's **deferred one runloop tick** — the click arrives via `StatusItemDragView.performClick(_:)`, which highlights then un-highlights as it returns, so a synchronous call gets wiped. Cleared on `NSPopover.willCloseNotification` (not `didClose`, which fires only after the close animation and leaves the pill lingering).
+
+**Right-click / control-click menu** (Settings…, Quit): presented by assigning `statusItem.menu` and calling `performClick`, then detaching it in `menuDidClose` so left-click still opens the popover. Do **not** use `NSMenu.popUp(in: button)` — a menu anchored to the status button inherits the menu bar's dark/vibrant appearance and renders dark even in Light Mode; the system-presented `statusItem.menu` uses the correct appearance and draws its own highlight.
+
+**Appearance gotcha:** anything anchored to the status button inherits the menu bar's appearance. `showPopover()` sets `popover.appearance = NSApp.effectiveAppearance` so the popover follows the system Light/Dark setting instead of rendering dark in Light Mode.
+
 ## Popover
 
 A Finder-like file browser laid out top-to-bottom: **header** (brand logo + word mark, then the New Folder / Refresh / Settings / Quit icon buttons) → **full-width breadcrumb bar** → **body** (destinations sidebar on the left, file table on the right) → **drop zone** pinned at the bottom. Fixed **780 × 580 pt**, driven by `NSHostingController.sizingOptions = [.preferredContentSize]`.
@@ -30,7 +42,7 @@ The brand logo (`ShareMasterLogo`) composites two asset-catalog images — `Logo
 Two drop surfaces:
 
 1. **Into the open popover** — the drop zone, or directly onto a sidebar destination row. The drop zone and file picker **upload in place**: in Browse mode files land in the folder currently open (`keyPrefix = browsePrefix`), not the destination root; in Recent (All) they go to the destination's configured root. Dropping onto a **sidebar row** routes through `selectDestination(_:)` — it selects that destination and resets it to its root (a "send to this destination" gesture) before uploading. Rows highlight with an accent fill while a drag hovers, and the list auto-scrolls to neighbours during a drag.
-2. **Onto the menu bar icon itself** — `StatusItemDragView`, a transparent NSView over the status-item button registered for `.fileURL` drags. Drag-enter opens the popover mid-drag; dropping on the icon posts `.statusItemDidReceiveDrop`, which ContentView uploads to the selected destination's currently-open folder (`uploadKeyPrefix`). It forwards `mouseDown` so click-to-toggle still works.
+2. **Onto the menu bar icon itself** — `StatusItemDragView`, a transparent NSView over the status-item button registered for `.fileURL` drags. Drag-enter opens the popover mid-drag; dropping on the icon posts `.statusItemDidReceiveDrop`, which ContentView uploads to the selected destination's currently-open folder (`uploadKeyPrefix`). It forwards `mouseDown` so click-to-toggle still works, and `rightMouseDown` (plus control-click) opens the status menu (see [Menu bar item](#menu-bar-item)).
 
 Uploads thread a `keyPrefix` through `handleDrop` / `openFilePicker` / `uploadFiles` into `S3Service.upload`, which prepends it to the (naming-template-expanded) basename.
 
@@ -38,9 +50,11 @@ After a drag-initiated upload, the popover auto-closes **only if** it was opened
 
 ## Settings
 
-Opened via SwiftUI's native `Settings` scene using `@Environment(\.openSettings)` from the popover's gear button (**do not** recreate a custom settings NSWindow — one existed and was removed). Tab order: **General / Accounts / Destinations / Sync / About**. Accounts and Destinations support Duplicate (a duplicated account copies the source's keychain secrets). Hidden destinations and the accounts used only by them are concealed here too until revealed (see [iOS doc](ios.md#hidden-destinations-decoy-mode) — the reveal gesture is tapping the ShareMaster word mark).
+Opened via SwiftUI's native `Settings` scene using `@Environment(\.openSettings)` from the popover's gear button (**do not** recreate a custom settings NSWindow — one existed and was removed). It's also reachable from the menu-bar item's right-click menu, which opens it via the `showSettingsWindow:` AppKit action. Tab order: **General / Accounts / Destinations / Sync / About**. Accounts and Destinations support Duplicate (a duplicated account copies the source's keychain secrets). Hidden destinations and the accounts used only by them are concealed here too until revealed (see [iOS doc](ios.md#hidden-destinations-decoy-mode) — the reveal gesture is tapping the ShareMaster word mark).
 
-**General** carries the macOS-only, non-synced *Recent (All) shows at most* N pref (`recentLimit`). (`browserDefaultExpanded` still exists but is inert now the table is always shown.) **Destination editor** has a *Sort files by* picker writing `Destination.browserSort` (the browse default, shared with iOS) and an **Icon** section — a colour-swatch row + SF Symbol grid writing `Destination.iconSymbol` / `iconTint`. Those fields decode on iOS but the picker and sidebar icons are **macOS-only for now** (see the memory note / future iOS parity task).
+**Deleting** an account, destination, or file is guarded by an "are you sure?" confirmation (`confirmationDialog`) — accounts warn that Keychain credentials go too; destinations note the bucket's files are untouched; files warn the delete is permanent. (Accounts still also refuse to delete while a destination references them.)
+
+**General** carries the macOS-only, non-synced *Recent (All) shows at most* N pref (`recentLimit`) and the **Menu bar icon** dropdown (`menuBarIconStyle` — see [Menu bar item](#menu-bar-item)). (`browserDefaultExpanded` still exists but is inert now the table is always shown.) **Destination editor** has a *Sort files by* picker writing `Destination.browserSort` (the browse default, shared with iOS) and an **Icon** section — a colour-swatch row + SF Symbol grid writing `Destination.iconSymbol` / `iconTint`. Those fields decode on iOS but the picker and sidebar icons are **macOS-only for now** (see the memory note / future iOS parity task).
 
 ## Browsing, actions & download locations
 
