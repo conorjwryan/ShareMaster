@@ -360,40 +360,6 @@ struct BucketBrowserView: View {
                         }
                     }
                 }
-                // Attached to the row (not the List) so iOS anchors the
-                // popover-style dialog to the file being deleted.
-                .confirmationDialog(
-                    "Delete \u{201C}\(object.filename)\u{201D}?",
-                    isPresented: Binding(
-                        get: { pendingDelete?.id == object.id },
-                        set: { if !$0 { pendingDelete = nil } }
-                    ),
-                    titleVisibility: .visible
-                ) {
-                    Button("Delete", role: .destructive) {
-                        pendingDelete = nil
-                        Task { await delete(object) }
-                    }
-                    Button("Cancel", role: .cancel) { pendingDelete = nil }
-                } message: {
-                    Text(deleteMessage(for: object))
-                }
-                .confirmationDialog(
-                    "Remove downloaded copy of \u{201C}\(object.filename)\u{201D}?",
-                    isPresented: Binding(
-                        get: { pendingRemoveDownload?.id == object.id },
-                        set: { if !$0 { pendingRemoveDownload = nil } }
-                    ),
-                    titleVisibility: .visible
-                ) {
-                    Button("Remove Download", role: .destructive) {
-                        pendingRemoveDownload = nil
-                        downloadStore.remove(for: object, destination: destination)
-                    }
-                    Button("Cancel", role: .cancel) { pendingRemoveDownload = nil }
-                } message: {
-                    Text("This only removes the copy on this device to free up space. The file still exists in \(destination.bucket) and can be downloaded again.")
-                }
             }
 
             if nextToken != nil {
@@ -411,6 +377,45 @@ struct BucketBrowserView: View {
             if isShowingOfflineCache {
                 offlineBanner
             }
+        }
+        // Attached once to the List (not per-row inside the ForEach): a
+        // per-row dialog is torn down whenever the list re-renders — which
+        // the downloads/network observables do constantly — so it flashed
+        // open and vanished before you could confirm. Presenting off the
+        // optional keeps a single stable dialog for the whole list.
+        .confirmationDialog(
+            Text(pendingDelete.map { "Delete \u{201C}\($0.filename)\u{201D}?" } ?? ""),
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingDelete
+        ) { object in
+            Button("Delete", role: .destructive) {
+                pendingDelete = nil
+                Task { await delete(object) }
+            }
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        } message: { object in
+            Text(deleteMessage(for: object))
+        }
+        .confirmationDialog(
+            Text(pendingRemoveDownload.map { "Remove downloaded copy of \u{201C}\($0.filename)\u{201D}?" } ?? ""),
+            isPresented: Binding(
+                get: { pendingRemoveDownload != nil },
+                set: { if !$0 { pendingRemoveDownload = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingRemoveDownload
+        ) { object in
+            Button("Remove Download", role: .destructive) {
+                pendingRemoveDownload = nil
+                downloadStore.remove(for: object, destination: destination)
+            }
+            Button("Cancel", role: .cancel) { pendingRemoveDownload = nil }
+        } message: { object in
+            Text("This only removes the copy on this device to free up space. The file still exists in \(destination.bucket) and can be downloaded again.")
         }
     }
 
