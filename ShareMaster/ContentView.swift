@@ -1948,6 +1948,7 @@ struct FileRowView: View {
     @State private var isHovered = false
     @State private var isDeleting = false
     @State private var isCopied = false
+    @State private var showDeleteConfirm = false
 
     private var primaryText: Color { isSelected ? .white : .primary }
     private var secondaryText: Color { isSelected ? Color.white.opacity(0.85) : .secondary }
@@ -1998,6 +1999,22 @@ struct FileRowView: View {
         .onHover { isHovered = $0 }
         .onTapGesture(count: 2) { if !isDownloading { onPreview() } }
         .onTapGesture { onSelect() }
+        .confirmationDialog(
+            "Delete \"\(object.filename)\"?",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete File", role: .destructive) {
+                Task {
+                    isDeleting = true
+                    await onDelete()
+                    isDeleting = false
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This permanently deletes the file from the bucket. This can't be undone.")
+        }
     }
 
     @ViewBuilder
@@ -2064,11 +2081,7 @@ struct FileRowView: View {
                 if !isDownloading { onPreview() }
             }
             Button {
-                Task {
-                    isDeleting = true
-                    await onDelete()
-                    isDeleting = false
-                }
+                showDeleteConfirm = true
             } label: {
                 Group {
                     if isDeleting {

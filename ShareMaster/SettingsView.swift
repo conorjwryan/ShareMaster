@@ -68,6 +68,7 @@ struct AccountsSettingsView: View {
     /// editor (the draft's own ID has none in the Keychain yet).
     @State private var duplicateSourceID: UUID?
     @State private var deleteError: String?
+    @State private var pendingDeleteAccount: Account?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -99,7 +100,7 @@ struct AccountsSettingsView: View {
                             } label: { Image(systemName: "pencil") }
                                 .buttonStyle(.borderless)
                             Button(role: .destructive) {
-                                delete(account)
+                                pendingDeleteAccount = account
                             } label: { Image(systemName: "trash").foregroundStyle(.red) }
                                 .buttonStyle(.borderless)
                         }
@@ -130,6 +131,19 @@ struct AccountsSettingsView: View {
             Button("OK") { deleteError = nil }
         } message: {
             Text(deleteError ?? "")
+        }
+        .confirmationDialog(
+            "Delete \"\(pendingDeleteAccount?.name.isEmpty == false ? pendingDeleteAccount!.name : "Untitled")\"?",
+            isPresented: .constant(pendingDeleteAccount != nil),
+            titleVisibility: .visible
+        ) {
+            Button("Delete Account", role: .destructive) {
+                if let account = pendingDeleteAccount { delete(account) }
+                pendingDeleteAccount = nil
+            }
+            Button("Cancel", role: .cancel) { pendingDeleteAccount = nil }
+        } message: {
+            Text("This removes the account and its stored credentials from your Keychain. This can't be undone.")
         }
     }
 
@@ -282,6 +296,7 @@ struct DestinationsSettingsView: View {
 
     @State private var editingDestination: Destination?
     @State private var isNewDestination = false
+    @State private var pendingDeleteDestination: Destination?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -329,7 +344,7 @@ struct DestinationsSettingsView: View {
                             } label: { Image(systemName: "pencil") }
                                 .buttonStyle(.borderless)
                             Button(role: .destructive) {
-                                config.deleteDestination(id: destination.id)
+                                pendingDeleteDestination = destination
                             } label: { Image(systemName: "trash").foregroundStyle(.red) }
                                 .buttonStyle(.borderless)
                         }
@@ -355,6 +370,21 @@ struct DestinationsSettingsView: View {
         }
         .sheet(item: $editingDestination) { destination in
             DestinationEditor(destination: destination, isNew: isNewDestination)
+        }
+        .confirmationDialog(
+            "Delete \"\(pendingDeleteDestination?.name.isEmpty == false ? pendingDeleteDestination!.name : "Untitled")\"?",
+            isPresented: .constant(pendingDeleteDestination != nil),
+            titleVisibility: .visible
+        ) {
+            Button("Delete Destination", role: .destructive) {
+                if let destination = pendingDeleteDestination {
+                    config.deleteDestination(id: destination.id)
+                }
+                pendingDeleteDestination = nil
+            }
+            Button("Cancel", role: .cancel) { pendingDeleteDestination = nil }
+        } message: {
+            Text("This removes the destination from ShareMaster. Files already uploaded to its bucket are not affected.")
         }
         // A duplicate started from the popover's context menu: open the
         // editor with the ready-made draft.
