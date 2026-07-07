@@ -18,7 +18,7 @@ Those PNGs are **generated from the colour logo art** (`LogoBox` / `LogoPlane`):
 
 A Finder-like file browser laid out top-to-bottom: **header** (brand logo + word mark, then the New Folder / Refresh / Settings / Quit icon buttons) → **full-width breadcrumb bar** → **body** (destinations sidebar on the left, file table on the right) → **drop zone** pinned at the bottom. Fixed **780 × 580 pt**, driven by `NSHostingController.sizingOptions = [.preferredContentSize]`.
 
-The brand logo (`ShareMasterLogo`) composites two asset-catalog images — `LogoBox` + `LogoPlane`, copied from `Shared/sharemaster.icon/Assets` — into the app-icon mark (a paper plane flying out of an open box). Tapping the **word mark** is still the hidden reveal gesture for hidden destinations.
+The brand logo (`ShareMasterLogo`) renders the `LogoPlane` asset beside the word mark. Tapping the **word mark** is still the hidden reveal gesture for hidden destinations.
 
 **The file table always shows** (there's no longer a collapse-to-small state — `recentsExpanded` is forced `true` on open, so the old `browserDefaultExpanded` seed is vestigial on macOS). Columns are **Name / Date / Size**; the Name and Date headers are clickable to sort. A **`≡` options menu** at the right of the column header holds the sort options, the view-mode switch, and the Browse folder/destination actions. It has two modes (`ConfigStore.browserPaneMode`, remembered across opens):
 

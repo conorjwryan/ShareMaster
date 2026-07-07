@@ -1518,25 +1518,16 @@ struct ContentView: View {
 
 // MARK: - Brand logo
 
-/// The ShareMaster mark: a paper plane flying out of an open box, composited
-/// from the two icon layers so it matches the app icon.
+/// The ShareMaster mark shown beside the word mark in the popover header.
 struct ShareMasterLogo: View {
     var body: some View {
         GeometryReader { geo in
             let s = min(geo.size.width, geo.size.height)
-            ZStack {
-                Image("LogoBox")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: s * 0.78, height: s * 0.78)
-                    .offset(x: -s * 0.12, y: s * 0.16)
-                Image("LogoPlane")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: s * 0.52, height: s * 0.52)
-                    .offset(x: s * 0.30, y: -s * 0.30)
-            }
-            .frame(width: geo.size.width, height: geo.size.height)
+            Image("LogoPlane")
+                .resizable()
+                .scaledToFit()
+                .frame(width: s * 0.9, height: s * 0.9)
+                .frame(width: geo.size.width, height: geo.size.height)
         }
     }
 }
