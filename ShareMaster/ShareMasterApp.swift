@@ -198,7 +198,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let icon = NSImage(named: style.assetName)
             ?? NSImage(systemSymbolName: "paperplane", accessibilityDescription: "ShareMaster")
         icon?.isTemplate = true
-        icon?.size = NSSize(width: 17, height: 17)
+        icon?.size = NSSize(width: 18, height: 18)
         button.image = icon
     }
 
