@@ -158,6 +158,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Clear the drag flag so a later click-opened popover doesn't
             // auto-close after an unrelated upload.
             self?.popoverOpenedByDrag = false
+            // Drop the selection highlight now that the popover is dismissed.
+            self?.statusItem?.button?.highlight(false)
             self?.schedulePopoverTeardown()
         }
     }
@@ -198,7 +200,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let icon = NSImage(named: style.assetName)
             ?? NSImage(systemSymbolName: "paperplane", accessibilityDescription: "ShareMaster")
         icon?.isTemplate = true
-        icon?.size = NSSize(width: 18, height: 18)
+        icon?.size = NSSize(width: 22, height: 22)
+        icon?.accessibilityDescription = "ShareMaster"
         button.image = icon
     }
 
@@ -227,6 +230,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
+
+        // Show the standard rounded selection background behind the icon while
+        // the popover is open, matching every other menu-bar item.
+        button.highlight(true)
 
         // Add solid white background to popover (including the arrow/notch)
         if let contentView = popover.contentViewController?.view,
