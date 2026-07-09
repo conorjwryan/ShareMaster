@@ -35,6 +35,8 @@ The brand logo (`ShareMasterLogo`) renders the `LogoPlane` asset beside the word
 - Each open re-runs the content `.task`, which is also what picks up synced config changes (see [Sync](sync.md)).
 - Thumbnails are 96 px ImageIO downsamples (`ImageLoader`, cache capped at 300). Never decode full-size images for list thumbnails — that's how the app once hit ~190 MB.
 
+**Idle / App Nap behaviour (important for battery):** the app relies on macOS App Nap, but it also has to avoid keeping itself awake. `ContentView` tracks `NSApp.isActive` and treats passive work as foreground-only: the five-second iCloud Keychain sync poll is cancelled while inactive, Browse and Recent (All) reloads are routed through cancellable foreground list tasks, stale listing completions do not update the UI after focus is lost, and thumbnail URLSession work is cancelled on resign-active. `SettingsView` applies the same active-only rule to its sync poll. Explicit uploads/downloads still continue while unfocused; only passive sync/list/preview work goes quiet. See [Battery optimisations](battery-optimisations.md) for the focused note.
+
 **Pin setting:** `ConfigStore.pinPopover` (General settings) switches popover behaviour between `.transient` (default, closes on outside click) and `.semitransient` (stays up). Applied on every `showPopover()`.
 
 ## Drag and drop

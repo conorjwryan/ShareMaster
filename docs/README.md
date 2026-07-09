@@ -13,6 +13,7 @@ These docs describe how the codebase is organised, how the three app targets wor
 | [Provider policies](provider_policies.md) | How AWS S3 and Cloudflare R2 differ — S3-spec subsets, listing-order guarantees, what LIST/GET/egress cost, ACL behaviour — and which claims are verified per provider |
 | [Sync](sync.md) | How config + credentials sync between macOS and iOS via iCloud Keychain, refresh/polling triggers, per-device settings, known limitations |
 | [macOS app](macos.md) | Menu-bar popover, folder browser (Browse ↔ Recent All, breadcrumbs, sort, upload-in-place, create folder/destination), drag-and-drop (including onto the menu bar icon), lazy popover lifecycle, Settings, per-destination download locations |
+| [Battery optimisations](battery-optimisations.md) | macOS idle behaviour: foreground-only sync/list/thumbnail work, App Nap-friendly cancellation, and what still runs during active transfers |
 | [iOS app & share extension](ios.md) | In-app uploads (`UploadManager`), share-sheet uploads, offline downloads (`DownloadStore`/`DownloadManager`, Files-app visibility, export), App Group storage, mobile-data gating, hidden destinations ("decoy mode") |
 | [Development](development.md) | Build commands, signing, project conventions (synchronized folders, MainActor default, optional Codable fields), debugging gotchas |
 
