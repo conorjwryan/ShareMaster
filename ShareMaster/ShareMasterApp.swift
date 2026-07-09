@@ -103,6 +103,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// icon (rather than a click). Used to auto-close it once the upload ends.
     private var popoverOpenedByDrag = false
     private var popoverTeardown: DispatchWorkItem?
+    private var outsideClickMonitor: Any?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Hide dock icon
@@ -201,6 +202,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // Clear the drag flag so a later click-opened popover doesn't
             // auto-close after an unrelated upload.
             self?.popoverOpenedByDrag = false
+            self?.stopOutsideClickMonitor()
             ConfigStore.shared.temporaryPinPopover = false
             self?.schedulePopoverTeardown()
         }
@@ -278,6 +280,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
+        startOutsideClickMonitor()
 
         // Show the standard rounded selection background behind the icon while
         // the popover is open, matching every other menu-bar item. Deferred to
@@ -317,6 +320,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                   self.shouldKeepPopoverOpen == false,
                   NSApp.isActive == false else { return }
             self.popover?.performClose(nil)
+        }
+    }
+
+    private func closePopoverIfUnpinned() {
+        guard popover?.isShown == true,
+              shouldKeepPopoverOpen == false else { return }
+        popover?.performClose(nil)
+    }
+
+    private func startOutsideClickMonitor() {
+        guard outsideClickMonitor == nil else { return }
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.closePopoverIfUnpinned()
+            }
+        }
+    }
+
+    private func stopOutsideClickMonitor() {
+        if let outsideClickMonitor {
+            NSEvent.removeMonitor(outsideClickMonitor)
+            self.outsideClickMonitor = nil
         }
     }
     
