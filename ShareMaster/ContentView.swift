@@ -538,16 +538,31 @@ struct ContentView: View {
 
     @ViewBuilder
     private var detail: some View {
-        VStack(spacing: 0) {
-            if let destination = selectedDestination {
-                columnHeader
-                Divider()
-                fileList
-                if let error = errorMessage {
-                    errorBar(error)
+        ZStack {
+            VStack(spacing: 0) {
+                if let destination = selectedDestination {
+                    columnHeader
+                    Divider()
+                    fileList
+                    if let error = errorMessage {
+                        errorBar(error)
+                    }
+                    dropZone(for: destination)
                 }
-                dropZone(for: destination)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            if isTargeted && !isUploading {
+                FullPaneDropOverlay(targetName: sectionTitle)
+                    .allowsHitTesting(false)
+            }
+        }
+        .contentShape(Rectangle())
+        .onDrop(of: [.fileURL, .image], isTargeted: $isTargeted) { providers in
+            guard !isUploading, let destination = selectedDestination else { return false }
+            NSApp.activate(ignoringOtherApps: true)
+            handleDrop(providers, to: destination, keyPrefix: uploadKeyPrefix)
+            return true
         }
     }
 
@@ -772,12 +787,6 @@ struct ContentView: View {
         )
         .onTapGesture {
             if !isUploading { openFilePicker(destination, keyPrefix: uploadKeyPrefix) }
-        }
-        .onDrop(of: [.fileURL, .image], isTargeted: $isTargeted) { providers in
-            guard !isUploading else { return false }
-            NSApp.activate(ignoringOtherApps: true)
-            handleDrop(providers, to: destination, keyPrefix: uploadKeyPrefix)
-            return true
         }
         .padding(16)
     }
@@ -1823,7 +1832,7 @@ struct DropZoneView: View {
                         .foregroundStyle(isTargeted ? Color.accentColor : .secondary)
                     Text(isTargeted
                          ? "Drop to upload"
-                         : (targetName.isEmpty ? "Drop here or click to upload" : "Drop here to upload to \(targetName)"))
+                         : (targetName.isEmpty ? "Drop here or click to upload" : "Drop here or click to upload to \(targetName)"))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -1846,6 +1855,42 @@ struct DropZoneView: View {
         )
         .contentShape(Rectangle())
         .animation(.easeInOut(duration: 0.15), value: isTargeted)
+    }
+}
+
+struct FullPaneDropOverlay: View {
+    var targetName: String
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(Color(nsColor: .windowBackgroundColor))
+                .overlay(Color.accentColor.opacity(0.09))
+                .overlay(
+                    Rectangle()
+                        .strokeBorder(
+                            Color.accentColor,
+                            style: StrokeStyle(lineWidth: 2, dash: [6, 4])
+                        )
+                )
+
+            VStack(spacing: 10) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 30))
+                    .foregroundStyle(Color.accentColor)
+                Text("Drop to upload")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                Text(targetName.isEmpty ? "Files will upload to the selected destination" : "Files will upload to \(targetName)")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .padding(.horizontal, 24)
+        }
+        .transition(.opacity)
+        .animation(.easeInOut(duration: 0.12), value: targetName)
     }
 }
 
